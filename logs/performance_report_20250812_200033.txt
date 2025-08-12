@@ -1,0 +1,40 @@
+============================================================
+📊 TRADING PERFORMANCE REPORT
+============================================================
+📅 Generated: 2025-08-12 20:00:33
+
+💰 ACCOUNT SUMMARY
+------------------------------
+Account: 273631674
+Server: Exness-MT5Trial6
+Balance: $3736587.23
+Equity: $3741622.86
+Margin: $27337.97
+Free Margin: $3714284.89
+Margin Level: 13686.5%
+Leverage: 1:2000
+
+📈 CURRENT POSITIONS
+------------------------------
+#2309054727: XAUUSDm 0.01 lots
+  Type: BUY
+  Open: 3351.48100
+  Current: 3351.78700
+  Profit: $5035.63
+
+Total Open P&L: $5035.63
+
+📊 PERFORMANCE METRICS
+------------------------------
+Daily Profit: $0.00
+Daily Profit %: 0.00%
+Equity Ratio: 100.1%
+Daily Trades: 3
+
+🛡️ RISK ASSESSMENT
+------------------------------
+Risk Level: LOW ✅
+Equity/Balance: 100.1%
+Margin Status: SAFE ✅
+
+============================================================
