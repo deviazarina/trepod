@@ -207,46 +207,133 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
         return pd.Series([0.001] * len(df))  # Return small default ATR
 
 
-def calculate_support_resistance(df: pd.DataFrame, window: int = 20) -> dict:
-    """Calculate support and resistance levels"""
+def calculate_support_resistance(df: pd.DataFrame, window: int = 10) -> dict:
+    """Enhanced support and resistance calculation with swing point detection"""
     try:
-        # Use rolling windows to find local highs and lows
-        highs = df['high'].rolling(window, center=True).max()
-        lows = df['low'].rolling(window, center=True).min()
-
-        # Find resistance (local highs)
+        current_price = df['close'].iloc[-1]
         resistance_levels = []
-        for i in range(window, len(df) - window):
-            if df['high'].iloc[i] == highs.iloc[i]:
-                resistance_levels.append(df['high'].iloc[i])
-
-        # Find support (local lows)
         support_levels = []
+        
+        # SWING HIGH DETECTION (Resistance)
         for i in range(window, len(df) - window):
-            if df['low'].iloc[i] == lows.iloc[i]:
-                support_levels.append(df['low'].iloc[i])
-
-        # Get most relevant levels (recent and significant)
-        if resistance_levels:
-            resistance = sorted(resistance_levels[-10:])[-3:]  # Last 3 significant resistance
-        else:
-            resistance = [df['high'].iloc[-20:].max()]
-
-        if support_levels:
-            support = sorted(support_levels[-10:])[:3]  # Last 3 significant support
-        else:
-            support = [df['low'].iloc[-20:].min()]
-
+            current_high = df['high'].iloc[i]
+            
+            # Check if current high is higher than surrounding candles
+            left_highs = df['high'].iloc[i-window:i].values
+            right_highs = df['high'].iloc[i+1:i+window+1].values
+            
+            # Swing high if current high is greater than all surrounding highs
+            if (current_high >= max(left_highs) and 
+                current_high >= max(right_highs) and
+                current_high > current_price * 0.999):  # Only include relevant levels
+                
+                # Check for multiple touches (stronger level)
+                touches = sum(1 for j in range(max(0, i-50), min(len(df), i+50)) 
+                             if abs(df['high'].iloc[j] - current_high) / current_high < 0.0005)
+                
+                resistance_levels.append({
+                    'price': current_high,
+                    'index': i,
+                    'touches': touches,
+                    'strength': touches * 1.5 if current_high > current_price else touches
+                })
+        
+        # SWING LOW DETECTION (Support)
+        for i in range(window, len(df) - window):
+            current_low = df['low'].iloc[i]
+            
+            # Check if current low is lower than surrounding candles
+            left_lows = df['low'].iloc[i-window:i].values
+            right_lows = df['low'].iloc[i+1:i+window+1].values
+            
+            # Swing low if current low is less than all surrounding lows
+            if (current_low <= min(left_lows) and 
+                current_low <= min(right_lows) and
+                current_low < current_price * 1.001):  # Only include relevant levels
+                
+                # Check for multiple touches (stronger level)
+                touches = sum(1 for j in range(max(0, i-50), min(len(df), i+50)) 
+                             if abs(df['low'].iloc[j] - current_low) / current_low < 0.0005)
+                
+                support_levels.append({
+                    'price': current_low,
+                    'index': i,
+                    'touches': touches,
+                    'strength': touches * 1.5 if current_low < current_price else touches
+                })
+        
+        # PSYCHOLOGICAL LEVELS (Round numbers)
+        psychological_levels = []
+        if current_price > 1:  # For major pairs
+            # Find nearest round numbers
+            base = int(current_price * 10000) / 10000  # 4 decimal precision
+            for offset in [-0.01, -0.005, 0, 0.005, 0.01]:
+                level = round(base + offset, 4)
+                if abs(level - current_price) / current_price < 0.02:  # Within 2%
+                    psychological_levels.append(level)
+        
+        # SORT AND FILTER LEVELS
+        # Sort resistance by strength and recency
+        resistance_levels.sort(key=lambda x: (-x['strength'], -x['index']))
+        resistance = [level['price'] for level in resistance_levels[:5]]  # Top 5 resistance
+        
+        # Sort support by strength and recency
+        support_levels.sort(key=lambda x: (-x['strength'], -x['index']))
+        support = [level['price'] for level in support_levels[:5]]  # Top 5 support
+        
+        # Add fallback levels if not enough detected
+        if len(resistance) < 2:
+            recent_high = df['high'].iloc[-50:].max()
+            if recent_high not in resistance:
+                resistance.append(recent_high)
+        
+        if len(support) < 2:
+            recent_low = df['low'].iloc[-50:].min()
+            if recent_low not in support:
+                support.append(recent_low)
+        
+        # RECENT BREAKOUT LEVELS
+        breakout_levels = []
+        for i in range(len(df) - 20, len(df)):  # Last 20 candles
+            if i > 0:
+                prev_candle = df.iloc[i-1]
+                current_candle = df.iloc[i]
+                
+                # Detect breakouts
+                if current_candle['close'] > prev_candle['high'] * 1.0001:  # Bullish breakout
+                    breakout_levels.append({
+                        'price': prev_candle['high'],
+                        'type': 'broken_resistance',
+                        'candle_index': i
+                    })
+                elif current_candle['close'] < prev_candle['low'] * 0.9999:  # Bearish breakout
+                    breakout_levels.append({
+                        'price': prev_candle['low'],
+                        'type': 'broken_support',
+                        'candle_index': i
+                    })
+        
+        logger(f"📊 S/R Detection: Found {len(resistance)} resistance, {len(support)} support, {len(breakout_levels)} recent breakouts")
+        
         return {
-            'resistance': resistance,
-            'support': support,
-            'current_price': df['close'].iloc[-1]
+            'resistance': sorted(resistance, reverse=True),  # Highest first
+            'support': sorted(support),  # Lowest first
+            'current_price': current_price,
+            'psychological_levels': psychological_levels,
+            'breakout_levels': breakout_levels,
+            'resistance_details': resistance_levels[:3],  # Top 3 with details
+            'support_details': support_levels[:3]  # Top 3 with details
         }
 
     except Exception as e:
-        logger(f"❌ Error calculating support/resistance: {str(e)}")
+        logger(f"❌ Enhanced S/R calculation error: {str(e)}")
+        # Fallback to simple calculation
         return {
             'resistance': [df['high'].iloc[-20:].max()],
             'support': [df['low'].iloc[-20:].min()],
-            'current_price': df['close'].iloc[-1]
+            'current_price': df['close'].iloc[-1],
+            'psychological_levels': [],
+            'breakout_levels': [],
+            'resistance_details': [],
+            'support_details': []
         }

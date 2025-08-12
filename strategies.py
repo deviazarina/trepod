@@ -426,9 +426,173 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
         except Exception as fvg_e:
             logger(f"⚠️ FVG scalping analysis error: {str(fvg_e)}")
 
-        # ENHANCED Scalping conditions - More sensitive signals
+        # ADVANCED REVERSAL PATTERN ANALYSIS
+        try:
+            from scalping_reversal_detector import detect_reversal_patterns
+            reversal_result = detect_reversal_patterns(df, symbol)
 
-        # BALANCED EMA trend signals with enhanced BUY opportunities
+            if reversal_result.get('valid') and reversal_result.get('signal'):
+                reversal_signal = reversal_result['signal']
+                reversal_confidence = reversal_result['confidence']
+                pattern_count = reversal_result['pattern_count']
+
+                if reversal_signal == 'BUY' and reversal_confidence > 0.6:
+                    reversal_weight = int(reversal_confidence * pattern_count * 2)  # Weight by confidence and pattern count
+                    buy_signals += reversal_weight
+                    signals.append(f"🔄 REVERSAL BUY: {pattern_count} patterns detected (Confidence: {reversal_confidence:.1%})")
+                    logger(f"🟢 REVERSAL SCALPING BUY: {reversal_weight} signals from {pattern_count} patterns")
+                    
+                    # Log detected patterns
+                    for pattern in reversal_result['patterns_found']:
+                        logger(f"   📊 {pattern}")
+
+                elif reversal_signal == 'SELL' and reversal_confidence > 0.6:
+                    reversal_weight = int(reversal_confidence * pattern_count * 2)
+                    sell_signals += reversal_weight
+                    signals.append(f"🔄 REVERSAL SELL: {pattern_count} patterns detected (Confidence: {reversal_confidence:.1%})")
+                    logger(f"🔴 REVERSAL SCALPING SELL: {reversal_weight} signals from {pattern_count} patterns")
+                    
+                    # Log detected patterns
+                    for pattern in reversal_result['patterns_found']:
+                        logger(f"   📊 {pattern}")
+
+            else:
+                logger(f"🔍 REVERSAL ANALYSIS: {reversal_result.get('reason', 'No clear reversal patterns')}")
+
+        except Exception as rev_e:
+            logger(f"⚠️ Reversal pattern analysis error: {str(rev_e)}")
+
+        # ADVANCED SUPPORT/RESISTANCE ANALYSIS for scalping
+        try:
+            from indicators import calculate_support_resistance
+            sr_levels = calculate_support_resistance(df)
+            
+            resistance_levels = sr_levels.get('resistance', [])
+            support_levels = sr_levels.get('support', [])
+            
+            # Find nearest support and resistance
+            if resistance_levels and support_levels:
+                nearest_resistance = min(resistance_levels, key=lambda x: abs(x - current_price))
+                nearest_support = min(support_levels, key=lambda x: abs(x - current_price))
+                
+                # Calculate distance to levels (in pips)
+                resistance_distance = (nearest_resistance - current_price) / point
+                support_distance = (current_price - nearest_support) / point
+                
+                logger(f"📊 S/R Analysis: Resistance @ {nearest_resistance:.{digits}f} ({resistance_distance:.1f} pips), Support @ {nearest_support:.{digits}f} ({support_distance:.1f} pips)")
+                
+                # RESISTANCE ANALYSIS
+                if abs(resistance_distance) <= 5:  # Within 5 pips of resistance
+                    if current_price > nearest_resistance + (2 * point):  # Broke above resistance
+                        buy_signals += 3
+                        signals.append(f"✅ RESISTANCE BREAK: Price broke above {nearest_resistance:.{digits}f} (+{abs(resistance_distance):.1f} pips)")
+                    elif resistance_distance > 0 and resistance_distance <= 3:  # Approaching resistance from below
+                        sell_signals += 2
+                        signals.append(f"⚠️ RESISTANCE REJECTION: Approaching resistance {nearest_resistance:.{digits}f} ({resistance_distance:.1f} pips away)")
+                
+                # SUPPORT ANALYSIS
+                if abs(support_distance) <= 5:  # Within 5 pips of support
+                    if current_price < nearest_support - (2 * point):  # Broke below support
+                        sell_signals += 3
+                        signals.append(f"✅ SUPPORT BREAK: Price broke below {nearest_support:.{digits}f} (-{abs(support_distance):.1f} pips)")
+                    elif support_distance > 0 and support_distance <= 3:  # Approaching support from above
+                        buy_signals += 2
+                        signals.append(f"💎 SUPPORT BOUNCE: Price near support {nearest_support:.{digits}f} ({support_distance:.1f} pips above)")
+                
+                # RANGE TRADING SIGNALS
+                range_size = (nearest_resistance - nearest_support) / point
+                if range_size > 5:  # Only if range is significant
+                    range_position = (current_price - nearest_support) / (nearest_resistance - nearest_support)
+                    
+                    if range_position <= 0.2:  # Bottom 20% of range
+                        buy_signals += 1
+                        signals.append(f"📈 RANGE BOTTOM: Price in lower 20% of range (Position: {range_position:.1%})")
+                    elif range_position >= 0.8:  # Top 20% of range
+                        sell_signals += 1
+                        signals.append(f"📉 RANGE TOP: Price in upper 20% of range (Position: {range_position:.1%})")
+        
+        except Exception as sr_e:
+            logger(f"⚠️ S/R analysis error: {str(sr_e)}")
+        
+        # ADVANCED REVERSAL PATTERN DETECTION
+        try:
+            # Get more historical data for pattern analysis
+            if len(df) >= 10:
+                # 1. ENGULFING PATTERNS
+                prev2 = df.iloc[-3] if len(df) > 3 else prev
+                
+                # Bullish Engulfing
+                if (prev['close'] < prev['open'] and  # Previous red candle
+                    last['close'] > last['open'] and   # Current green candle
+                    last['open'] < prev['close'] and   # Current opens below prev close
+                    last['close'] > prev['open']):     # Current closes above prev open
+                    buy_signals += 4
+                    signals.append("🟢 BULLISH ENGULFING: Strong reversal pattern detected")
+                
+                # Bearish Engulfing
+                elif (prev['close'] > prev['open'] and  # Previous green candle
+                      last['close'] < last['open'] and   # Current red candle
+                      last['open'] > prev['close'] and   # Current opens above prev close
+                      last['close'] < prev['open']):     # Current closes below prev open
+                    sell_signals += 4
+                    signals.append("🔴 BEARISH ENGULFING: Strong reversal pattern detected")
+                
+                # 2. DOJI PATTERNS (indecision)
+                body_size = abs(last['close'] - last['open'])
+                candle_range = last['high'] - last['low']
+                
+                if candle_range > 0 and body_size / candle_range < 0.1:  # Small body relative to range
+                    upper_shadow = last['high'] - max(last['open'], last['close'])
+                    lower_shadow = min(last['open'], last['close']) - last['low']
+                    
+                    # Dragonfly Doji (bullish reversal at support)
+                    if lower_shadow > upper_shadow * 3 and current_price < last['EMA20']:
+                        buy_signals += 3
+                        signals.append("🐉 DRAGONFLY DOJI: Bullish reversal pattern at lows")
+                    
+                    # Gravestone Doji (bearish reversal at resistance)
+                    elif upper_shadow > lower_shadow * 3 and current_price > last['EMA20']:
+                        sell_signals += 3
+                        signals.append("⚰️ GRAVESTONE DOJI: Bearish reversal pattern at highs")
+                
+                # 3. HAMMER/SHOOTING STAR PATTERNS
+                if candle_range > 0:
+                    upper_wick = last['high'] - max(last['open'], last['close'])
+                    lower_wick = min(last['open'], last['close']) - last['low']
+                    
+                    # Hammer (bullish reversal)
+                    if (lower_wick > body_size * 2 and 
+                        upper_wick < body_size and
+                        current_price < df['close'].rolling(5).mean().iloc[-1]):  # Below recent average
+                        buy_signals += 2
+                        signals.append("🔨 HAMMER: Bullish reversal candlestick")
+                    
+                    # Shooting Star (bearish reversal)
+                    elif (upper_wick > body_size * 2 and 
+                          lower_wick < body_size and
+                          current_price > df['close'].rolling(5).mean().iloc[-1]):  # Above recent average
+                        sell_signals += 2
+                        signals.append("⭐ SHOOTING STAR: Bearish reversal candlestick")
+                
+                # 4. PIN BAR PATTERNS
+                total_range = last['high'] - last['low']
+                if total_range > 0:
+                    # Bullish Pin Bar
+                    if (lower_wick > total_range * 0.6 and  # Long lower tail
+                        upper_wick < total_range * 0.2):    # Short upper tail
+                        buy_signals += 3
+                        signals.append("📌 BULLISH PIN BAR: Strong rejection of lower prices")
+                    
+                    # Bearish Pin Bar
+                    elif (upper_wick > total_range * 0.6 and  # Long upper tail
+                          lower_wick < total_range * 0.2):    # Short lower tail
+                        sell_signals += 3
+                        signals.append("📌 BEARISH PIN BAR: Strong rejection of higher prices")
+        
+        except Exception as rev_e:
+            logger(f"⚠️ Reversal pattern analysis error: {str(rev_e)}")
+        
+        # ENHANCED EMA trend signals with enhanced BUY opportunities
         if last['EMA8'] > last['EMA20']:
             signals.append("EMA8 above EMA20 (Bullish trend)")
             buy_signals += 1
