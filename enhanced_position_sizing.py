@@ -428,7 +428,7 @@ def get_dynamic_position_size(symbol: str, strategy: str, base_lot_size: float) 
                 atr_pips = float(atr_pips)
         except (TypeError, ValueError, IndexError, AttributeError):
             atr_pips = 5.0
-            
+
         # Safe comparison for volatility factor
         try:
             # Handle numpy arrays, pandas Series, and scalar values
@@ -441,7 +441,7 @@ def get_dynamic_position_size(symbol: str, strategy: str, base_lot_size: float) 
                     atr_pips_val = float(atr_pips)
             else:
                 atr_pips_val = float(atr_pips)
-                
+
             if atr_pips_val > 20:  # High volatility
                 volatility_factor = 0.8
             elif atr_pips_val < 5:  # Low volatility
@@ -465,7 +465,7 @@ def get_dynamic_position_size(symbol: str, strategy: str, base_lot_size: float) 
                 spread_pips = float(spread_pips)
         except (TypeError, ValueError, IndexError, AttributeError):
             spread_pips = 2.0
-            
+
         # Safe comparison for spread factor
         try:
             # Handle numpy arrays, pandas Series, and scalar values
@@ -478,7 +478,7 @@ def get_dynamic_position_size(symbol: str, strategy: str, base_lot_size: float) 
                     spread_pips_val = float(spread_pips)
             else:
                 spread_pips_val = float(spread_pips)
-                
+
             if spread_pips_val > 3:  # Wide spread
                 spread_factor = 0.7
             elif spread_pips_val < 1:  # Tight spread
