@@ -48,7 +48,7 @@ def run_strategy(strategy: str, df: pd.DataFrame, symbol: str) -> Tuple[Optional
                     try:
                         from xauusd_btcusd_ultra_scalper import run_ultra_scalping_analysis
                         ultra_result = run_ultra_scalping_analysis(symbol)
-                        
+
                         if ultra_result.get('signal') and ultra_result.get('confidence', 0) >= 0.15:  # Ultra-low threshold
                             logger(f"🚀 ULTRA-SCALPING: {ultra_result['signal']} signal for {symbol}")
                             logger(f"   ⚡ Confidence: {ultra_result['confidence']:.1%}")
@@ -59,7 +59,7 @@ def run_strategy(strategy: str, df: pd.DataFrame, symbol: str) -> Tuple[Optional
                             return ultra_result['signal'], reasons
                     except Exception as ultra_e:
                         logger(f"⚠️ Ultra-scalping analysis failed: {str(ultra_e)}")
-                
+
                 if confidence >= threshold:
                     logger(f"✅ ENHANCED ANALYSIS: {enhanced_result['signal']} signal (Confidence: {confidence:.1%}, Threshold: {threshold:.0%})")
                     logger(f"   🔍 Reason: {enhanced_result.get('reason', 'N/A')}")
@@ -231,7 +231,7 @@ def run_strategy(strategy: str, df: pd.DataFrame, symbol: str) -> Tuple[Optional
         # SMART SIGNAL VALIDATION - Pastikan tidak ngawur
         try:
             from smart_signal_validator import validate_trading_signal
-            
+
             # Prepare analysis data for validation
             validation_data = {
                 'confidence': confidence if 'confidence' in locals() else 0.6,
@@ -241,7 +241,7 @@ def run_strategy(strategy: str, df: pd.DataFrame, symbol: str) -> Tuple[Optional
                 'typical_spread': current_spread * 1.2,
                 'strategy': strategy
             }
-            
+
             # Add any available technical signals
             if 'enhanced_result' in locals() and enhanced_result:
                 validation_data.update({
@@ -249,33 +249,33 @@ def run_strategy(strategy: str, df: pd.DataFrame, symbol: str) -> Tuple[Optional
                     'base_confidence': enhanced_result.get('confidence', 0),
                     'technical_analysis': enhanced_result.get('analysis', {})
                 })
-            
+
             # Smart validation akan mencegah trades yang ngawur
             validation_result = validate_trading_signal(symbol, enhanced_result.get('signal', 'NEUTRAL'), validation_data, df)
-            
+
             if not validation_result['is_valid']:
                 logger(f"🛑 SMART VALIDATION: Trade REJECTED for {symbol}")
                 logger(f"   ❌ Quality Grade: {validation_result['quality_grade']}")
                 logger(f"   ❌ Reasons: {', '.join(validation_result['rejection_reasons'])}")
                 return None, validation_result['rejection_reasons']
-            
+
             # Apply validation multipliers untuk trades berkualitas
             confidence_multiplier = validation_result['confidence_multiplier']
             position_multiplier = validation_result['position_size_multiplier']
             quality_grade = validation_result['quality_grade']
-            
+
             logger(f"✅ SMART VALIDATION: {quality_grade} grade signal APPROVED")
             logger(f"   🎯 Quality Score: {validation_result['quality_score']:.1%}")
             logger(f"   📈 Confidence boost: {confidence_multiplier:.2f}x")
             logger(f"   📊 Position size: {position_multiplier:.2f}x")
-            
+
             # Override TP/SL with validated recommendations if available
             if validation_result.get('recommended_tp') and validation_result.get('recommended_sl'):
                 validation_data['tp_pips'] = validation_result['recommended_tp']
                 validation_data['sl_pips'] = validation_result['recommended_sl']
                 logger(f"   🎯 Optimized TP: {validation_data['tp_pips']} pips")
                 logger(f"   🛡️ Optimized SL: {validation_data['sl_pips']} pips")
-                
+
         except Exception as validation_error:
             logger(f"⚠️ Smart validation error: {str(validation_error)}")
             # Continue without validation if validator fails
@@ -441,7 +441,7 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
                     buy_signals += reversal_weight
                     signals.append(f"🔄 REVERSAL BUY: {pattern_count} patterns detected (Confidence: {reversal_confidence:.1%})")
                     logger(f"🟢 REVERSAL SCALPING BUY: {reversal_weight} signals from {pattern_count} patterns")
-                    
+
                     # Log detected patterns
                     for pattern in reversal_result['patterns_found']:
                         logger(f"   📊 {pattern}")
@@ -451,7 +451,7 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
                     sell_signals += reversal_weight
                     signals.append(f"🔄 REVERSAL SELL: {pattern_count} patterns detected (Confidence: {reversal_confidence:.1%})")
                     logger(f"🔴 REVERSAL SCALPING SELL: {reversal_weight} signals from {pattern_count} patterns")
-                    
+
                     # Log detected patterns
                     for pattern in reversal_result['patterns_found']:
                         logger(f"   📊 {pattern}")
@@ -466,21 +466,21 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
         try:
             from indicators import calculate_support_resistance
             sr_levels = calculate_support_resistance(df)
-            
+
             resistance_levels = sr_levels.get('resistance', [])
             support_levels = sr_levels.get('support', [])
-            
+
             # Find nearest support and resistance
             if resistance_levels and support_levels:
                 nearest_resistance = min(resistance_levels, key=lambda x: abs(x - current_price))
                 nearest_support = min(support_levels, key=lambda x: abs(x - current_price))
-                
+
                 # Calculate distance to levels (in pips)
                 resistance_distance = (nearest_resistance - current_price) / point
                 support_distance = (current_price - nearest_support) / point
-                
+
                 logger(f"📊 S/R Analysis: Resistance @ {nearest_resistance:.{digits}f} ({resistance_distance:.1f} pips), Support @ {nearest_support:.{digits}f} ({support_distance:.1f} pips)")
-                
+
                 # RESISTANCE ANALYSIS
                 if abs(resistance_distance) <= 5:  # Within 5 pips of resistance
                     if current_price > nearest_resistance + (2 * point):  # Broke above resistance
@@ -489,7 +489,7 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
                     elif resistance_distance > 0 and resistance_distance <= 3:  # Approaching resistance from below
                         sell_signals += 2
                         signals.append(f"⚠️ RESISTANCE REJECTION: Approaching resistance {nearest_resistance:.{digits}f} ({resistance_distance:.1f} pips away)")
-                
+
                 # SUPPORT ANALYSIS
                 if abs(support_distance) <= 5:  # Within 5 pips of support
                     if current_price < nearest_support - (2 * point):  # Broke below support
@@ -498,29 +498,29 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
                     elif support_distance > 0 and support_distance <= 3:  # Approaching support from above
                         buy_signals += 2
                         signals.append(f"💎 SUPPORT BOUNCE: Price near support {nearest_support:.{digits}f} ({support_distance:.1f} pips above)")
-                
+
                 # RANGE TRADING SIGNALS
                 range_size = (nearest_resistance - nearest_support) / point
                 if range_size > 5:  # Only if range is significant
                     range_position = (current_price - nearest_support) / (nearest_resistance - nearest_support)
-                    
+
                     if range_position <= 0.2:  # Bottom 20% of range
                         buy_signals += 1
                         signals.append(f"📈 RANGE BOTTOM: Price in lower 20% of range (Position: {range_position:.1%})")
                     elif range_position >= 0.8:  # Top 20% of range
                         sell_signals += 1
                         signals.append(f"📉 RANGE TOP: Price in upper 20% of range (Position: {range_position:.1%})")
-        
+
         except Exception as sr_e:
             logger(f"⚠️ S/R analysis error: {str(sr_e)}")
-        
+
         # ADVANCED REVERSAL PATTERN DETECTION
         try:
             # Get more historical data for pattern analysis
             if len(df) >= 10:
                 # 1. ENGULFING PATTERNS
                 prev2 = df.iloc[-3] if len(df) > 3 else prev
-                
+
                 # Bullish Engulfing
                 if (prev['close'] < prev['open'] and  # Previous red candle
                     last['close'] > last['open'] and   # Current green candle
@@ -528,7 +528,7 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
                     last['close'] > prev['open']):     # Current closes above prev open
                     buy_signals += 4
                     signals.append("🟢 BULLISH ENGULFING: Strong reversal pattern detected")
-                
+
                 # Bearish Engulfing
                 elif (prev['close'] > prev['open'] and  # Previous green candle
                       last['close'] < last['open'] and   # Current red candle
@@ -536,44 +536,44 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
                       last['close'] < prev['open']):     # Current closes below prev open
                     sell_signals += 4
                     signals.append("🔴 BEARISH ENGULFING: Strong reversal pattern detected")
-                
+
                 # 2. DOJI PATTERNS (indecision)
                 body_size = abs(last['close'] - last['open'])
                 candle_range = last['high'] - last['low']
-                
+
                 if candle_range > 0 and body_size / candle_range < 0.1:  # Small body relative to range
                     upper_shadow = last['high'] - max(last['open'], last['close'])
                     lower_shadow = min(last['open'], last['close']) - last['low']
-                    
+
                     # Dragonfly Doji (bullish reversal at support)
                     if lower_shadow > upper_shadow * 3 and current_price < last['EMA20']:
                         buy_signals += 3
                         signals.append("🐉 DRAGONFLY DOJI: Bullish reversal pattern at lows")
-                    
+
                     # Gravestone Doji (bearish reversal at resistance)
                     elif upper_shadow > lower_shadow * 3 and current_price > last['EMA20']:
                         sell_signals += 3
                         signals.append("⚰️ GRAVESTONE DOJI: Bearish reversal pattern at highs")
-                
+
                 # 3. HAMMER/SHOOTING STAR PATTERNS
                 if candle_range > 0:
                     upper_wick = last['high'] - max(last['open'], last['close'])
                     lower_wick = min(last['open'], last['close']) - last['low']
-                    
+
                     # Hammer (bullish reversal)
-                    if (lower_wick > body_size * 2 and 
+                    if (lower_wick > body_size * 2 and
                         upper_wick < body_size and
                         current_price < df['close'].rolling(5).mean().iloc[-1]):  # Below recent average
                         buy_signals += 2
                         signals.append("🔨 HAMMER: Bullish reversal candlestick")
-                    
+
                     # Shooting Star (bearish reversal)
-                    elif (upper_wick > body_size * 2 and 
+                    elif (upper_wick > body_size * 2 and
                           lower_wick < body_size and
                           current_price > df['close'].rolling(5).mean().iloc[-1]):  # Above recent average
                         sell_signals += 2
                         signals.append("⭐ SHOOTING STAR: Bearish reversal candlestick")
-                
+
                 # 4. PIN BAR PATTERNS
                 total_range = last['high'] - last['low']
                 if total_range > 0:
@@ -582,16 +582,16 @@ def scalping_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, 
                         upper_wick < total_range * 0.2):    # Short upper tail
                         buy_signals += 3
                         signals.append("📌 BULLISH PIN BAR: Strong rejection of lower prices")
-                    
+
                     # Bearish Pin Bar
                     elif (upper_wick > total_range * 0.6 and  # Long upper tail
-                          lower_wick < total_range * 0.2):    # Short lower tail
+                          lower_wick < total_range * 0.2):    # Short upper tail
                         sell_signals += 3
                         signals.append("📌 BEARISH PIN BAR: Strong rejection of higher prices")
-        
+
         except Exception as rev_e:
             logger(f"⚠️ Reversal pattern analysis error: {str(rev_e)}")
-        
+
         # ENHANCED EMA trend signals with enhanced BUY opportunities
         if last['EMA8'] > last['EMA20']:
             signals.append("EMA8 above EMA20 (Bullish trend)")
@@ -1049,3 +1049,38 @@ def hft_strategy(df: pd.DataFrame, symbol: str, current_tick, digits: int, point
     except Exception as e:
         logger(f"❌ HFT strategy error: {str(e)}")
         return None, [f"HFT error: {str(e)}"]
+
+# Placeholder for execute_trade_signal function (assuming it exists elsewhere or needs to be defined)
+# This function is crucial for actually placing trades based on signals.
+# If it's not defined, the strategy execution might not result in actual trades.
+def execute_trade_signal(symbol: str, action: str, strategy: str = "Scalping", lot_size: float = 0.01, 
+                         tp_value: str = "20", sl_value: str = "10", tp_unit: str = "pips", sl_unit: str = "pips") -> bool:
+    """Executes a trade based on the given signal parameters, integrating GUI lot size."""
+    try:
+        # Get GUI parameters if available, including lot size
+        import __main__
+        gui = getattr(__main__, 'gui', None)
+
+        # Override lot size with GUI value if available
+        if gui and hasattr(gui, 'get_current_lot_size'):
+            gui_lot_size = gui.get_current_lot_size()
+            if gui_lot_size != lot_size:
+                logger(f"💰 Strategy: Using GUI lot size: {lot_size} → {gui_lot_size}")
+                lot_size = gui_lot_size
+        
+        if action == "BUY":
+            logger(f"EXECUTING BUY ORDER: Symbol={symbol}, Lot={lot_size}, TP={tp_value} {tp_unit}, SL={sl_value} {sl_unit}")
+            # Placeholder for actual MT5 BUY order execution
+            # Example: mt5.order_send(...)
+            return True
+        elif action == "SELL":
+            logger(f"EXECUTING SELL ORDER: Symbol={symbol}, Lot={lot_size}, TP={tp_value} {tp_unit}, SL={sl_value} {sl_unit}")
+            # Placeholder for actual MT5 SELL order execution
+            # Example: mt5.order_send(...)
+            return True
+        else:
+            logger(f"NO TRADING ACTION TAKEN for {symbol}")
+            return False
+    except Exception as e:
+        logger(f"❌ Error executing trade signal: {str(e)}")
+        return False

@@ -156,6 +156,8 @@ class TradingBotGUI:
         self.lot_entry = ttk.Entry(params_frame, width=8)
         self.lot_entry.insert(0, "0.01")
         self.lot_entry.grid(row=1, column=1, padx=(0, 10), sticky="w")
+        self.lot_entry.bind("<KeyRelease>", self.on_lot_size_change)
+        self.lot_entry.bind("<FocusOut>", self.on_lot_size_validate)
 
         ttk.Label(params_frame, text="SL:").grid(row=1, column=2, sticky="w", padx=(0,3))
 
@@ -632,6 +634,55 @@ class TradingBotGUI:
         except Exception as e:
             self.log(f"❌ Error processing manual symbol: {str(e)}")
 
+    def on_lot_size_change(self, event=None):
+        """Handle lot size input changes"""
+        try:
+            lot_text = self.lot_entry.get().strip()
+            if lot_text and len(lot_text) > 0:
+                try:
+                    lot_value = float(lot_text)
+                    if lot_value > 0:
+                        self.log(f"💰 Lot size updated: {lot_value}")
+                except ValueError:
+                    pass  # Ignore invalid input during typing
+        except Exception as e:
+            pass
+
+    def on_lot_size_validate(self, event=None):
+        """Validate lot size when focus is lost"""
+        try:
+            lot_text = self.lot_entry.get().strip()
+            if not lot_text:
+                self.lot_entry.delete(0, tk.END)
+                self.lot_entry.insert(0, "0.01")
+                self.log("⚠️ Empty lot size, reset to 0.01")
+                return
+
+            try:
+                lot_value = float(lot_text)
+                if lot_value < 0.01:
+                    self.lot_entry.delete(0, tk.END)
+                    self.lot_entry.insert(0, "0.01")
+                    self.log("⚠️ Lot size too small, adjusted to 0.01")
+                elif lot_value > 100.0:
+                    self.lot_entry.delete(0, tk.END)
+                    self.lot_entry.insert(0, "100.0")
+                    self.log("⚠️ Lot size too large, adjusted to 100.0")
+                else:
+                    # Format to 2 decimal places
+                    formatted_lot = f"{lot_value:.2f}"
+                    if formatted_lot != lot_text:
+                        self.lot_entry.delete(0, tk.END)
+                        self.lot_entry.insert(0, formatted_lot)
+                    self.log(f"✅ Lot size validated: {formatted_lot}")
+            except ValueError:
+                self.lot_entry.delete(0, tk.END)
+                self.lot_entry.insert(0, "0.01")
+                self.log("❌ Invalid lot size format, reset to 0.01")
+
+        except Exception as e:
+            self.log(f"❌ Error validating lot size: {str(e)}")
+
     def validate_symbol_data(self, symbol: str):
         """Validate symbol can provide data from MT5"""
         try:
@@ -684,10 +735,27 @@ class TradingBotGUI:
         try:
             lot_text = self.lot_entry.get().strip()
             if not lot_text:
+                self.log("⚠️ Lot size empty, using default 0.01")
                 return 0.01
-            return validate_numeric_input(lot_text, min_val=0.01, max_val=100.0)
-        except:
-            self.log("⚠️ Invalid lot size, using 0.01")
+            
+            lot_value = float(lot_text)
+            
+            # Validate lot size range
+            if lot_value < 0.01:
+                self.log(f"⚠️ Lot size too small ({lot_value}), using minimum 0.01")
+                return 0.01
+            elif lot_value > 100.0:
+                self.log(f"⚠️ Lot size too large ({lot_value}), using maximum 100.0")
+                return 100.0
+            
+            self.log(f"✅ GUI Lot size: {lot_value}")
+            return lot_value
+            
+        except ValueError as e:
+            self.log(f"❌ Invalid lot size format: {lot_text}, using 0.01")
+            return 0.01
+        except Exception as e:
+            self.log(f"❌ Error getting lot size: {str(e)}, using 0.01")
             return 0.01
 
     def get_current_tp(self) -> float:

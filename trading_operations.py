@@ -117,14 +117,14 @@ def calculate_tp_sl_all_modes(input_value: str, unit: str, symbol: str, order_ty
             is_tp = value > 0  # Positive values from GUI = TP, Negative values = SL
 
             if order_type.upper() == "BUY":
-                if is_tp:  # Take Profit - should be ABOVE current price
+                if is_tp:  # Take Profit
                     return round(current_price * (1 + percentage / 100), digits)
-                else:  # Stop Loss - should be BELOW current price
+                else:  # Stop Loss
                     return round(current_price * (1 - percentage / 100), digits)
             else:  # SELL order
-                if is_tp:  # Take Profit - should be BELOW current price
+                if is_tp:  # Take Profit
                     return round(current_price * (1 - percentage / 100), digits)
-                else:  # Stop Loss - should be ABOVE current price
+                else:  # Stop Loss
                     return round(current_price * (1 + percentage / 100), digits)
 
         elif unit.lower() in ["balance%", "equity%"]:
@@ -235,15 +235,25 @@ def execute_trade(symbol: str, action: str, lot_size: float = 0.01, tp_value: st
 
         logger(f"📊 Current prices: Bid={current_bid:.5f}, Ask={current_ask:.5f}")
 
-        # 2. DYNAMIC POSITION SIZING INTEGRATION
+        # 2. GET LOT SIZE FROM GUI AND APPLY DYNAMIC SIZING
         try:
+            # Get lot size from GUI first
+            import __main__
+            if hasattr(__main__, 'gui') and __main__.gui and hasattr(__main__.gui, 'get_current_lot_size'):
+                gui_lot_size = __main__.gui.get_current_lot_size()
+                if gui_lot_size != lot_size:
+                    logger(f"💰 GUI lot size override: {lot_size} → {gui_lot_size}")
+                    lot_size = gui_lot_size
+
+            # Then apply dynamic position sizing
             from enhanced_position_sizing import get_dynamic_position_size
             dynamic_lot = get_dynamic_position_size(symbol, strategy, lot_size)
             if dynamic_lot != lot_size:
                 logger(f"🎯 Dynamic sizing: {lot_size} → {dynamic_lot}")
                 lot_size = dynamic_lot
+
         except Exception as e:
-            logger(f"⚠️ Dynamic position sizing failed: {str(e)}")
+            logger(f"⚠️ Position sizing integration failed: {str(e)}")
 
         # 3. CALCULATE TP/SL LEVELS
         tp_price = 0.0
@@ -387,15 +397,25 @@ def execute_trade_signal(symbol: str, action: str, lot_size: float = 0.01, tp_va
 
         logger(f"📊 Current prices: Bid={current_bid:.5f}, Ask={current_ask:.5f}")
 
-        # 2. DYNAMIC POSITION SIZING INTEGRATION
+        # 2. GET LOT SIZE FROM GUI AND APPLY DYNAMIC SIZING
         try:
+            # Get lot size from GUI first
+            import __main__
+            if hasattr(__main__, 'gui') and __main__.gui and hasattr(__main__.gui, 'get_current_lot_size'):
+                gui_lot_size = __main__.gui.get_current_lot_size()
+                if gui_lot_size != lot_size:
+                    logger(f"💰 GUI lot size override: {lot_size} → {gui_lot_size}")
+                    lot_size = gui_lot_size
+
+            # Then apply dynamic position sizing
             from enhanced_position_sizing import get_dynamic_position_size
             dynamic_lot = get_dynamic_position_size(symbol, strategy, lot_size)
             if dynamic_lot != lot_size:
                 logger(f"🎯 Dynamic sizing: {lot_size} → {dynamic_lot}")
                 lot_size = dynamic_lot
+
         except Exception as e:
-            logger(f"⚠️ Dynamic position sizing failed: {str(e)}")
+            logger(f"⚠️ Position sizing integration failed: {str(e)}")
 
         # 3. CALCULATE TP/SL LEVELS
         tp_price = 0.0

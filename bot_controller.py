@@ -188,22 +188,30 @@ def main_trading_loop() -> None:
                                 except Exception as gui_e:
                                     logger(f"⚠️ GUI instance retrieval failed: {str(gui_e)}")
 
-                                # Get trading parameters from GUI with proper defaults
-                                lot_size = 0.01
-                                tp_value = "20"
-                                sl_value = "10"
-                                tp_unit = "pips"
-                                sl_unit = "pips"
+                                # Execute signal with enhanced parameters from GUI
+                                try:
+                                    if gui and hasattr(gui, 'get_current_lot_size'):
+                                        lot_size = gui.get_current_lot_size()
+                                        logger(f"📊 Bot Controller: Using GUI lot size: {lot_size}")
+                                    else:
+                                        lot_size = 0.01
+                                        logger(f"⚠️ Bot Controller: GUI not available, using default lot: {lot_size}")
 
-                                if gui:
-                                    try:
-                                        lot_size = float(gui.get_current_lot() or 0.01)
-                                        tp_value = gui.get_current_tp() or "20"
-                                        sl_value = gui.get_current_sl() or "10"
-                                        tp_unit = gui.get_current_tp_unit() or "pips"
-                                        sl_unit = gui.get_current_sl_unit() or "pips"
-                                    except:
-                                        pass  # Use defaults
+                                    tp_value = gui.get_current_tp() if gui and hasattr(gui, 'get_current_tp') else "20"
+                                    sl_value = gui.get_current_sl() if gui and hasattr(gui, 'get_current_sl') else "10"
+                                    tp_unit = gui.get_tp_unit() if gui and hasattr(gui, 'get_tp_unit') else "pips"
+                                    sl_unit = gui.get_sl_unit() if gui and hasattr(gui, 'get_sl_unit') else "pips"
+
+                                    logger(f"📊 Trading Parameters: Lot={lot_size}, TP={tp_value}{tp_unit}, SL={sl_value}{sl_unit}")
+
+                                except Exception as param_e:
+                                    logger(f"⚠️ Error getting GUI parameters: {str(param_e)}")
+                                    lot_size = 0.01
+                                    tp_value = "20"
+                                    sl_value = "10"
+                                    tp_unit = "pips"
+                                    sl_unit = "pips"
+
 
                                 # Set strategy-specific defaults if empty
                                 if not tp_value or tp_value == "0":
@@ -694,22 +702,30 @@ def trading_loop():
                                 except Exception as gui_e:
                                     logger(f"⚠️ GUI instance retrieval failed: {str(gui_e)}")
 
-                                # Get trading parameters from GUI with proper defaults
-                                lot_size = 0.01
-                                tp_value = "20"
-                                sl_value = "10"
-                                tp_unit = "pips"
-                                sl_unit = "pips"
+                                # Execute signal with enhanced parameters from GUI
+                                try:
+                                    if gui and hasattr(gui, 'get_current_lot_size'):
+                                        lot_size = gui.get_current_lot_size()
+                                        logger(f"📊 Bot Controller: Using GUI lot size: {lot_size}")
+                                    else:
+                                        lot_size = 0.01
+                                        logger(f"⚠️ Bot Controller: GUI not available, using default lot: {lot_size}")
 
-                                if gui:
-                                    try:
-                                        lot_size = float(gui.get_current_lot() or 0.01)
-                                        tp_value = gui.get_current_tp() or "20"
-                                        sl_value = gui.get_current_sl() or "10"
-                                        tp_unit = gui.get_current_tp_unit() or "pips"
-                                        sl_unit = gui.get_current_sl_unit() or "pips"
-                                    except:
-                                        pass  # Use defaults
+                                    tp_value = gui.get_current_tp() if gui and hasattr(gui, 'get_current_tp') else "20"
+                                    sl_value = gui.get_current_sl() if gui and hasattr(gui, 'get_current_sl') else "10"
+                                    tp_unit = gui.get_tp_unit() if gui and hasattr(gui, 'get_tp_unit') else "pips"
+                                    sl_unit = gui.get_sl_unit() if gui and hasattr(gui, 'get_sl_unit') else "pips"
+
+                                    logger(f"📊 Trading Parameters: Lot={lot_size}, TP={tp_value}{tp_unit}, SL={sl_value}{sl_unit}")
+
+                                except Exception as param_e:
+                                    logger(f"⚠️ Error getting GUI parameters: {str(param_e)}")
+                                    lot_size = 0.01
+                                    tp_value = "20"
+                                    sl_value = "10"
+                                    tp_unit = "pips"
+                                    sl_unit = "pips"
+
 
                                 # Set strategy-specific defaults if empty
                                 if not tp_value or tp_value == "0":
