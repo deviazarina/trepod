@@ -191,16 +191,17 @@ def main_trading_loop() -> None:
                                 # Execute signal with enhanced parameters from GUI
                                 try:
                                     if gui and hasattr(gui, 'get_current_lot_size'):
-                                        lot_size = gui.get_current_lot_size()
+                                        lot_size = float(gui.get_current_lot_size())
                                         logger(f"📊 Bot Controller: Using GUI lot size: {lot_size}")
                                     else:
                                         lot_size = 0.01
                                         logger(f"⚠️ Bot Controller: GUI not available, using default lot: {lot_size}")
 
-                                    tp_value = gui.get_current_tp() if gui and hasattr(gui, 'get_current_tp') else "20"
-                                    sl_value = gui.get_current_sl() if gui and hasattr(gui, 'get_current_sl') else "10"
-                                    tp_unit = gui.get_tp_unit() if gui and hasattr(gui, 'get_tp_unit') else "pips"
-                                    sl_unit = gui.get_sl_unit() if gui and hasattr(gui, 'get_sl_unit') else "pips"
+                                    # Ensure TP/SL values are strings for processing
+                                    tp_value = str(gui.get_current_tp()) if gui and hasattr(gui, 'get_current_tp') else "20"
+                                    sl_value = str(gui.get_current_sl()) if gui and hasattr(gui, 'get_current_sl') else "10"
+                                    tp_unit = str(gui.get_tp_unit()) if gui and hasattr(gui, 'get_tp_unit') else "pips"
+                                    sl_unit = str(gui.get_sl_unit()) if gui and hasattr(gui, 'get_sl_unit') else "pips"
 
                                     logger(f"📊 Trading Parameters: Lot={lot_size}, TP={tp_value}{tp_unit}, SL={sl_value}{sl_unit}")
 
@@ -644,7 +645,7 @@ def trading_loop():
                     if hasattr(main_module, 'gui') and main_module.gui and hasattr(main_module.gui, 'symbol_combo') and main_module.gui.symbol_combo.get():
                         trading_symbols = [main_module.gui.symbol_combo.get()]
                     else:
-                        trading_symbols = DEFAULT_SYMBOLS[:3]  # Use first 3 default symbols
+                        trading_symbols = DEFAULT_SYMBOLS[:3]
                 except Exception as gui_sym_e:
                     logger(f"⚠️ GUI symbol retrieval issue: {str(gui_sym_e)}")
                     trading_symbols = DEFAULT_SYMBOLS[:3]
@@ -705,16 +706,16 @@ def trading_loop():
                                 # Execute signal with enhanced parameters from GUI
                                 try:
                                     if gui and hasattr(gui, 'get_current_lot_size'):
-                                        lot_size = gui.get_current_lot_size()
+                                        lot_size = float(gui.get_current_lot_size())
                                         logger(f"📊 Bot Controller: Using GUI lot size: {lot_size}")
                                     else:
                                         lot_size = 0.01
                                         logger(f"⚠️ Bot Controller: GUI not available, using default lot: {lot_size}")
 
-                                    tp_value = gui.get_current_tp() if gui and hasattr(gui, 'get_current_tp') else "20"
-                                    sl_value = gui.get_current_sl() if gui and hasattr(gui, 'get_current_sl') else "10"
-                                    tp_unit = gui.get_tp_unit() if gui and hasattr(gui, 'get_tp_unit') else "pips"
-                                    sl_unit = gui.get_sl_unit() if gui and hasattr(gui, 'get_sl_unit') else "pips"
+                                    tp_value = str(gui.get_current_tp()) if gui and hasattr(gui, 'get_current_tp') else "20"
+                                    sl_value = str(gui.get_current_sl()) if gui and hasattr(gui, 'get_current_sl') else "10"
+                                    tp_unit = str(gui.get_tp_unit()) if gui and hasattr(gui, 'get_tp_unit') else "pips"
+                                    sl_unit = str(gui.get_sl_unit()) if gui and hasattr(gui, 'get_sl_unit') else "pips"
 
                                     logger(f"📊 Trading Parameters: Lot={lot_size}, TP={tp_value}{tp_unit}, SL={sl_value}{sl_unit}")
 

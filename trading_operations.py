@@ -259,13 +259,20 @@ def execute_trade(symbol: str, action: str, lot_size: float = 0.01, tp_value: st
         tp_price = 0.0
         sl_price = 0.0
 
-        if tp_value and tp_value.strip() != "0":
-            tp_price = calculate_tp_sl_all_modes(tp_value, tp_unit, symbol, action, current_price, lot_size)
-            logger(f"🎯 Calculated TP: {tp_price:.5f}")
+        # Handle TP calculation with proper type checking
+        if tp_value:
+            tp_str = str(tp_value).strip() if hasattr(tp_value, 'strip') else str(tp_value)
+            if tp_str != "0" and tp_str != "":
+                tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
+                logger(f"🎯 Calculated TP: {tp_price:.5f}")
 
-        if sl_value and sl_value.strip() != "0":
-            sl_price = calculate_tp_sl_all_modes(sl_value, sl_unit, symbol, action, current_price, lot_size)
-            logger(f"🛡️ Calculated SL: {sl_price:.5f}")
+        # Handle SL calculation with proper type checking
+        if sl_value:
+            sl_str = str(sl_value).strip() if hasattr(sl_value, 'strip') else str(sl_value)
+            if sl_str != "0" and sl_str != "":
+                sl_price = calculate_tp_sl_all_modes(sl_str, sl_unit, symbol, action, current_price, lot_size)
+                logger(f"🛡️ Calculated SL: {sl_price:.5f}")
+
 
         # 4. PREPARE ORDER REQUEST WITH ENHANCED VALIDATION
         order_type = mt5.ORDER_TYPE_BUY if action == "BUY" else mt5.ORDER_TYPE_SELL
@@ -421,13 +428,19 @@ def execute_trade_signal(symbol: str, action: str, lot_size: float = 0.01, tp_va
         tp_price = 0.0
         sl_price = 0.0
 
-        if tp_value and tp_value.strip() != "0":
-            tp_price = calculate_tp_sl_all_modes(tp_value, tp_unit, symbol, action, current_price, lot_size)
-            logger(f"🎯 Calculated TP: {tp_price:.5f}")
+        # Handle TP calculation with proper type checking
+        if tp_value:
+            tp_str = str(tp_value).strip() if hasattr(tp_value, 'strip') else str(tp_value)
+            if tp_str != "0" and tp_str != "":
+                tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
+                logger(f"🎯 Calculated TP: {tp_price:.5f}")
 
-        if sl_value and sl_value.strip() != "0":
-            sl_price = calculate_tp_sl_all_modes(sl_value, sl_unit, symbol, action, current_price, lot_size)
-            logger(f"🛡️ Calculated SL: {sl_price:.5f}")
+        # Handle SL calculation with proper type checking
+        if sl_value:
+            sl_str = str(sl_value).strip() if hasattr(sl_value, 'strip') else str(sl_value)
+            if sl_str != "0" and sl_str != "":
+                sl_price = calculate_tp_sl_all_modes(sl_str, sl_unit, symbol, action, current_price, lot_size)
+                logger(f"🛡️ Calculated SL: {sl_price:.5f}")
 
         # 4. PREPARE ORDER REQUEST WITH ENHANCED VALIDATION
         order_type = mt5.ORDER_TYPE_BUY if action == "BUY" else mt5.ORDER_TYPE_SELL

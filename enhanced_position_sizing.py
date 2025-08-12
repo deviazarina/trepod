@@ -431,14 +431,24 @@ def get_dynamic_position_size(symbol: str, strategy: str, base_lot_size: float) 
             
         # Safe comparison for volatility factor
         try:
-            atr_pips_val = float(atr_pips)
+            # Handle numpy arrays, pandas Series, and scalar values
+            if hasattr(atr_pips, '__len__') and not isinstance(atr_pips, str):
+                if hasattr(atr_pips, 'iloc'):  # pandas Series
+                    atr_pips_val = float(atr_pips.iloc[-1])
+                elif hasattr(atr_pips, '__getitem__'):  # numpy array or list
+                    atr_pips_val = float(atr_pips[-1])
+                else:
+                    atr_pips_val = float(atr_pips)
+            else:
+                atr_pips_val = float(atr_pips)
+                
             if atr_pips_val > 20:  # High volatility
                 volatility_factor = 0.8
             elif atr_pips_val < 5:  # Low volatility
                 volatility_factor = 1.2
             else:
                 volatility_factor = 1.0
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, IndexError, AttributeError):
             volatility_factor = 1.0
 
         # Spread adjustment - FIXED: Handle numpy arrays and pandas Series properly
@@ -458,14 +468,24 @@ def get_dynamic_position_size(symbol: str, strategy: str, base_lot_size: float) 
             
         # Safe comparison for spread factor
         try:
-            spread_pips_val = float(spread_pips)
+            # Handle numpy arrays, pandas Series, and scalar values
+            if hasattr(spread_pips, '__len__') and not isinstance(spread_pips, str):
+                if hasattr(spread_pips, 'iloc'):  # pandas Series
+                    spread_pips_val = float(spread_pips.iloc[-1])
+                elif hasattr(spread_pips, '__getitem__'):  # numpy array or list
+                    spread_pips_val = float(spread_pips[-1])
+                else:
+                    spread_pips_val = float(spread_pips)
+            else:
+                spread_pips_val = float(spread_pips)
+                
             if spread_pips_val > 3:  # Wide spread
                 spread_factor = 0.7
             elif spread_pips_val < 1:  # Tight spread
                 spread_factor = 1.1
             else:
                 spread_factor = 1.0
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, IndexError, AttributeError):
             spread_factor = 1.0
 
         # Strategy-specific adjustments
