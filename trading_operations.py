@@ -256,125 +256,108 @@ def execute_trade(symbol: str, action: str, lot_size: float = 0.01, tp_value: st
             logger(f"⚠️ Position sizing integration failed: {str(e)}")
 
         # 3. CALCULATE TP/SL LEVELS
-        tp_price = 0.0
-        sl_price = 0.0
+        # FIXED: TP/SL Integration with MT5 - Get values from GUI
+        try:
+            # Get TP/SL values and units from GUI if available
+            import __main__
+            if hasattr(__main__, 'gui') and __main__.gui:
+                gui = __main__.gui
+                if hasattr(gui, 'get_tp_value'):
+                    tp_value = gui.get_tp_value()
+                    tp_unit = gui.get_tp_unit()
+                    logger(f"📊 GUI TP: {tp_value} {tp_unit}")
+                if hasattr(gui, 'get_sl_value'):
+                    sl_value = gui.get_sl_value()
+                    sl_unit = gui.get_sl_unit()
+                    logger(f"🛡️ GUI SL: {sl_value} {sl_unit}")
+        except Exception as gui_e:
+            logger(f"⚠️ GUI TP/SL integration warning: {str(gui_e)}")
 
-        # Handle TP calculation with proper type checking and SELL order fix
-        if tp_value:
-            tp_str = str(tp_value).strip() if hasattr(tp_value, 'strip') else str(tp_value)
-            if tp_str != "0" and tp_str != "":
-                # For SELL orders, TP should be BELOW entry price (profit when price goes down)
-                if action == "SELL":
-                    # Make TP value positive for calculation but direction will be handled in calculate_tp_sl_all_modes
-                    tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
-                else:
-                    tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
-                logger(f"🎯 Calculated TP for {action}: {tp_price:.5f} (Entry: {current_price:.5f})")
+        # Handle TP calculation with proper MT5 integration
+        if tp_value and str(tp_value).strip() not in ["0", ""]:
+            try:
+                tp_str = str(tp_value).strip()
+                tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
+                if tp_price > 0:
+                    # Validate TP level for MT5 compatibility
+                    symbol_info = mt5.symbol_info(symbol)
+                    if symbol_info:
+                        min_level = getattr(symbol_info, 'trade_stops_level', 0) * getattr(symbol_info, 'point', 0.00001)
+                        if action == "BUY" and tp_price <= current_price + min_level:
+                            tp_price = current_price + max(min_level, 0.0001)
+                        elif action == "SELL" and tp_price >= current_price - min_level:
+                            tp_price = current_price - max(min_level, 0.0001)
+                    logger(f"🎯 MT5 TP for {action}: {tp_price:.5f} (Entry: {current_price:.5f})")
+            except Exception as tp_e:
+                logger(f"❌ TP calculation error: {str(tp_e)}")
+                tp_price = 0.0
 
-        # Handle SL calculation with proper type checking and SELL order fix
-        if sl_value:
-            sl_str = str(sl_value).strip() if hasattr(sl_value, 'strip') else str(sl_value)
-            if sl_str != "0" and sl_str != "":
-                # For SELL orders, SL should be ABOVE entry price (loss when price goes up)
-                if action == "SELL":
-                    # SL is always a loss, so we use negative value for SELL
-                    sl_price = calculate_tp_sl_all_modes(f"-{sl_str}", sl_unit, symbol, action, current_price, lot_size)
-                else:
-                    # For BUY orders, SL is below entry price
-                    sl_price = calculate_tp_sl_all_modes(f"-{sl_str}", sl_unit, symbol, action, current_price, lot_size)
-                logger(f"🛡️ Calculated SL for {action}: {sl_price:.5f} (Entry: {current_price:.5f})")
+        # Handle SL calculation with proper MT5 integration
+        if sl_value and str(sl_value).strip() not in ["0", ""]:
+            try:
+                sl_str = str(sl_value).strip()
+                # Always use negative for SL calculation
+                if not sl_str.startswith('-'):
+                    sl_str = f"-{sl_str}"
+                sl_price = calculate_tp_sl_all_modes(sl_str, sl_unit, symbol, action, current_price, lot_size)
+                if sl_price > 0:
+                    # Validate SL level for MT5 compatibility
+                    symbol_info = mt5.symbol_info(symbol)
+                    if symbol_info:
+                        min_level = getattr(symbol_info, 'trade_stops_level', 0) * getattr(symbol_info, 'point', 0.00001)
+                        if action == "BUY" and sl_price >= current_price - min_level:
+                            sl_price = current_price - max(min_level, 0.0001)
+                        elif action == "SELL" and sl_price <= current_price + min_level:
+                            sl_price = current_price + max(min_level, 0.0001)
+                    logger(f"🛡️ MT5 SL for {action}: {sl_price:.5f} (Entry: {current_price:.5f})")
+            except Exception as sl_e:
+                logger(f"❌ SL calculation error: {str(sl_e)}")
+                sl_price = 0.0
 
 
         # 4. PREPARE ORDER REQUEST WITH ENHANCED VALIDATION
         order_type = mt5.ORDER_TYPE_BUY if action == "BUY" else mt5.ORDER_TYPE_SELL
 
-        # FIXED TP/SL validation for proper SELL order integration
-        symbol_info = mt5.symbol_info(symbol)
-        if symbol_info:
-            stops_level = getattr(symbol_info, 'trade_stops_level', 0)
-            min_distance = max(stops_level * symbol_info.point, symbol_info.point * 50)
-
-            # Special handling for Gold
-            if 'XAU' in symbol.upper() or 'GOLD' in symbol.upper():
-                min_distance = max(min_distance, 1.0)  # Minimum $1 for Gold
-
-            # Validate and adjust TP/SL if needed
-            if tp_price > 0:
-                if action == "BUY":
-                    # BUY TP must be above current price + minimum distance
-                    min_tp = current_price + min_distance
-                    if tp_price < min_tp:
-                        tp_price = round(min_tp, symbol_info.digits)
-                        logger(f"⚠️ BUY TP adjusted to minimum distance: {tp_price}")
-                else:  # SELL
-                    # SELL TP must be below current price - minimum distance
-                    max_tp = current_price - min_distance
-                    if tp_price > max_tp:
-                        tp_price = round(max_tp, symbol_info.digits)
-                        logger(f"⚠️ SELL TP adjusted to minimum distance: {tp_price}")
-                    elif tp_price >= current_price:
-                        # Ensure SELL TP is always below entry price
-                        tp_price = round(current_price - min_distance, symbol_info.digits)
-                        logger(f"⚠️ SELL TP corrected to be below entry: {tp_price}")
-
-            if sl_price > 0:
-                if action == "BUY":
-                    # BUY SL must be below current price - minimum distance
-                    max_sl = current_price - min_distance
-                    if sl_price > max_sl:
-                        sl_price = round(max_sl, symbol_info.digits)
-                        logger(f"⚠️ BUY SL adjusted to minimum distance: {sl_price}")
-                    elif sl_price >= current_price:
-                        # Ensure BUY SL is always below entry price
-                        sl_price = round(current_price - min_distance, symbol_info.digits)
-                        logger(f"⚠️ BUY SL corrected to be below entry: {sl_price}")
-                else:  # SELL
-                    # SELL SL must be above current price + minimum distance
-                    min_sl = current_price + min_distance
-                    if sl_price < min_sl:
-                        sl_price = round(min_sl, symbol_info.digits)
-                        logger(f"⚠️ SELL SL adjusted to minimum distance: {sl_price}")
-                    elif sl_price <= current_price:
-                        # Ensure SELL SL is always above entry price
-                        sl_price = round(current_price + min_distance, symbol_info.digits)
-                        logger(f"⚠️ SELL SL corrected to be above entry: {sl_price}")
-
-        # VERIFICATION: Log TP/SL relationship for SELL orders
-        if action == "SELL":
-            logger(f"🔍 SELL ORDER TP/SL VERIFICATION:")
-            logger(f"   📊 Entry Price: {current_price:.5f}")
-            if tp_price > 0:
-                tp_distance = current_price - tp_price
-                logger(f"   🎯 TP Price: {tp_price:.5f} (Distance: {tp_distance:.5f} {'✅ BELOW entry' if tp_price < current_price else '❌ ABOVE entry'})")
-            if sl_price > 0:
-                sl_distance = sl_price - current_price
-                logger(f"   🛡️ SL Price: {sl_price:.5f} (Distance: {sl_distance:.5f} {'✅ ABOVE entry' if sl_price > current_price else '❌ BELOW entry'})")
-        elif action == "BUY":
-            logger(f"🔍 BUY ORDER TP/SL VERIFICATION:")
-            logger(f"   📊 Entry Price: {current_price:.5f}")
-            if tp_price > 0:
-                tp_distance = tp_price - current_price
-                logger(f"   🎯 TP Price: {tp_price:.5f} (Distance: {tp_distance:.5f} {'✅ ABOVE entry' if tp_price > current_price else '❌ BELOW entry'})")
-            if sl_price > 0:
-                sl_distance = current_price - sl_price
-                logger(f"   🛡️ SL Price: {sl_price:.5f} (Distance: {sl_distance:.5f} {'✅ BELOW entry' if sl_price < current_price else '❌ ABOVE entry'})")
-
+        # ENHANCED MT5 REQUEST WITH PROPER TP/SL INTEGRATION
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,
-            "volume": lot_size,
+            "volume": round(lot_size, 2),  # Ensure proper lot size format
             "type": order_type,
-            "price": current_price,
-            "tp": tp_price if tp_price > 0 else 0.0,
-            "sl": sl_price if sl_price > 0 else 0.0,
-            "comment": f"Enhanced {strategy}",
+            "price": round(current_price, 5),  # Ensure proper price format
+            "deviation": 50,
+            "comment": f"MT5Bot-{strategy}",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
-            "deviation": 50,  # Add deviation for better execution
         }
 
+        # Add TP/SL only if valid values exist
+        if tp_price > 0:
+            request["tp"] = round(tp_price, 5)
+            logger(f"✅ TP added to MT5 request: {tp_price:.5f}")
+
+        if sl_price > 0:
+            request["sl"] = round(sl_price, 5)
+            logger(f"✅ SL added to MT5 request: {sl_price:.5f}")
+
+        # Log complete MT5 request for debugging
+        logger(f"📤 MT5 Request: {request}")
+
+        # Verify TP/SL relationship before sending
+        if tp_price > 0 and sl_price > 0:
+            if action == "BUY":
+                tp_valid = tp_price > current_price
+                sl_valid = sl_price < current_price
+            else:  # SELL
+                tp_valid = tp_price < current_price
+                sl_valid = sl_price > current_price
+
+            if not tp_valid or not sl_valid:
+                logger(f"❌ Invalid TP/SL relationship for {action}")
+                logger(f"   Current: {current_price:.5f}, TP: {tp_price:.5f}, SL: {sl_price:.5f}")
+                return None
+
         # 5. EXECUTE ORDER
-        logger(f"📤 Sending order request...")
         result = mt5.order_send(request)
 
         if result is None:
@@ -472,124 +455,107 @@ def execute_trade_signal(symbol: str, action: str, lot_size: float = 0.01, tp_va
             logger(f"⚠️ Position sizing integration failed: {str(e)}")
 
         # 3. CALCULATE TP/SL LEVELS
-        tp_price = 0.0
-        sl_price = 0.0
+        # FIXED: TP/SL Integration with MT5 - Get values from GUI
+        try:
+            # Get TP/SL values and units from GUI if available
+            import __main__
+            if hasattr(__main__, 'gui') and __main__.gui:
+                gui = __main__.gui
+                if hasattr(gui, 'get_tp_value'):
+                    tp_value = gui.get_tp_value()
+                    tp_unit = gui.get_tp_unit()
+                    logger(f"📊 GUI TP: {tp_value} {tp_unit}")
+                if hasattr(gui, 'get_sl_value'):
+                    sl_value = gui.get_sl_value()
+                    sl_unit = gui.get_sl_unit()
+                    logger(f"🛡️ GUI SL: {sl_value} {sl_unit}")
+        except Exception as gui_e:
+            logger(f"⚠️ GUI TP/SL integration warning: {str(gui_e)}")
 
-        # Handle TP calculation with proper type checking and SELL order fix
-        if tp_value:
-            tp_str = str(tp_value).strip() if hasattr(tp_value, 'strip') else str(tp_value)
-            if tp_str != "0" and tp_str != "":
-                # For SELL orders, TP should be BELOW entry price (profit when price goes down)
-                if action == "SELL":
-                    # Make TP value positive for calculation but direction will be handled in calculate_tp_sl_all_modes
-                    tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
-                else:
-                    tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
-                logger(f"🎯 Calculated TP for {action}: {tp_price:.5f} (Entry: {current_price:.5f})")
+        # Handle TP calculation with proper MT5 integration
+        if tp_value and str(tp_value).strip() not in ["0", ""]:
+            try:
+                tp_str = str(tp_value).strip()
+                tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
+                if tp_price > 0:
+                    # Validate TP level for MT5 compatibility
+                    symbol_info = mt5.symbol_info(symbol)
+                    if symbol_info:
+                        min_level = getattr(symbol_info, 'trade_stops_level', 0) * getattr(symbol_info, 'point', 0.00001)
+                        if action == "BUY" and tp_price <= current_price + min_level:
+                            tp_price = current_price + max(min_level, 0.0001)
+                        elif action == "SELL" and tp_price >= current_price - min_level:
+                            tp_price = current_price - max(min_level, 0.0001)
+                    logger(f"🎯 MT5 TP for {action}: {tp_price:.5f} (Entry: {current_price:.5f})")
+            except Exception as tp_e:
+                logger(f"❌ TP calculation error: {str(tp_e)}")
+                tp_price = 0.0
 
-        # Handle SL calculation with proper type checking and SELL order fix
-        if sl_value:
-            sl_str = str(sl_value).strip() if hasattr(sl_value, 'strip') else str(sl_value)
-            if sl_str != "0" and sl_str != "":
-                # For SELL orders, SL should be ABOVE entry price (loss when price goes up)
-                if action == "SELL":
-                    # SL is always a loss, so we use negative value for SELL
-                    sl_price = calculate_tp_sl_all_modes(f"-{sl_str}", sl_unit, symbol, action, current_price, lot_size)
-                else:
-                    # For BUY orders, SL is below entry price
-                    sl_price = calculate_tp_sl_all_modes(f"-{sl_str}", sl_unit, symbol, action, current_price, lot_size)
-                logger(f"🛡️ Calculated SL for {action}: {sl_price:.5f} (Entry: {current_price:.5f})")
+        # Handle SL calculation with proper MT5 integration
+        if sl_value and str(sl_value).strip() not in ["0", ""]:
+            try:
+                sl_str = str(sl_value).strip()
+                # Always use negative for SL calculation
+                if not sl_str.startswith('-'):
+                    sl_str = f"-{sl_str}"
+                sl_price = calculate_tp_sl_all_modes(sl_str, sl_unit, symbol, action, current_price, lot_size)
+                if sl_price > 0:
+                    # Validate SL level for MT5 compatibility
+                    symbol_info = mt5.symbol_info(symbol)
+                    if symbol_info:
+                        min_level = getattr(symbol_info, 'trade_stops_level', 0) * getattr(symbol_info, 'point', 0.00001)
+                        if action == "BUY" and sl_price >= current_price - min_level:
+                            sl_price = current_price - max(min_level, 0.0001)
+                        elif action == "SELL" and sl_price <= current_price + min_level:
+                            sl_price = current_price + max(min_level, 0.0001)
+                    logger(f"🛡️ MT5 SL for {action}: {sl_price:.5f} (Entry: {current_price:.5f})")
+            except Exception as sl_e:
+                logger(f"❌ SL calculation error: {str(sl_e)}")
+                sl_price = 0.0
 
         # 4. PREPARE ORDER REQUEST WITH ENHANCED VALIDATION
         order_type = mt5.ORDER_TYPE_BUY if action == "BUY" else mt5.ORDER_TYPE_SELL
 
-        # FIXED TP/SL validation for proper SELL order integration
-        symbol_info = mt5.symbol_info(symbol)
-        if symbol_info:
-            stops_level = getattr(symbol_info, 'trade_stops_level', 0)
-            min_distance = max(stops_level * symbol_info.point, symbol_info.point * 50)
-
-            # Special handling for Gold
-            if 'XAU' in symbol.upper() or 'GOLD' in symbol.upper():
-                min_distance = max(min_distance, 1.0)  # Minimum $1 for Gold
-
-            # Validate and adjust TP/SL if needed
-            if tp_price > 0:
-                if action == "BUY":
-                    # BUY TP must be above current price + minimum distance
-                    min_tp = current_price + min_distance
-                    if tp_price < min_tp:
-                        tp_price = round(min_tp, symbol_info.digits)
-                        logger(f"⚠️ BUY TP adjusted to minimum distance: {tp_price}")
-                else:  # SELL
-                    # SELL TP must be below current price - minimum distance
-                    max_tp = current_price - min_distance
-                    if tp_price > max_tp:
-                        tp_price = round(max_tp, symbol_info.digits)
-                        logger(f"⚠️ SELL TP adjusted to minimum distance: {tp_price}")
-                    elif tp_price >= current_price:
-                        # Ensure SELL TP is always below entry price
-                        tp_price = round(current_price - min_distance, symbol_info.digits)
-                        logger(f"⚠️ SELL TP corrected to be below entry: {tp_price}")
-
-            if sl_price > 0:
-                if action == "BUY":
-                    # BUY SL must be below current price - minimum distance
-                    max_sl = current_price - min_distance
-                    if sl_price > max_sl:
-                        sl_price = round(max_sl, symbol_info.digits)
-                        logger(f"⚠️ BUY SL adjusted to minimum distance: {sl_price}")
-                    elif sl_price >= current_price:
-                        # Ensure BUY SL is always below entry price
-                        sl_price = round(current_price - min_distance, symbol_info.digits)
-                        logger(f"⚠️ BUY SL corrected to be below entry: {sl_price}")
-                else:  # SELL
-                    # SELL SL must be above current price + minimum distance
-                    min_sl = current_price + min_distance
-                    if sl_price < min_sl:
-                        sl_price = round(min_sl, symbol_info.digits)
-                        logger(f"⚠️ SELL SL adjusted to minimum distance: {sl_price}")
-                    elif sl_price <= current_price:
-                        # Ensure SELL SL is always above entry price
-                        sl_price = round(current_price + min_distance, symbol_info.digits)
-                        logger(f"⚠️ SELL SL corrected to be above entry: {sl_price}")
-
-        # VERIFICATION: Log TP/SL relationship for SELL orders
-        if action == "SELL":
-            logger(f"🔍 SELL ORDER TP/SL VERIFICATION:")
-            logger(f"   📊 Entry Price: {current_price:.5f}")
-            if tp_price > 0:
-                tp_distance = current_price - tp_price
-                logger(f"   🎯 TP Price: {tp_price:.5f} (Distance: {tp_distance:.5f} {'✅ BELOW entry' if tp_price < current_price else '❌ ABOVE entry'})")
-            if sl_price > 0:
-                sl_distance = sl_price - current_price
-                logger(f"   🛡️ SL Price: {sl_price:.5f} (Distance: {sl_distance:.5f} {'✅ ABOVE entry' if sl_price > current_price else '❌ BELOW entry'})")
-        elif action == "BUY":
-            logger(f"🔍 BUY ORDER TP/SL VERIFICATION:")
-            logger(f"   📊 Entry Price: {current_price:.5f}")
-            if tp_price > 0:
-                tp_distance = tp_price - current_price
-                logger(f"   🎯 TP Price: {tp_price:.5f} (Distance: {tp_distance:.5f} {'✅ ABOVE entry' if tp_price > current_price else '❌ BELOW entry'})")
-            if sl_price > 0:
-                sl_distance = current_price - sl_price
-                logger(f"   🛡️ SL Price: {sl_price:.5f} (Distance: {sl_distance:.5f} {'✅ BELOW entry' if sl_price < current_price else '❌ ABOVE entry'})")
-
+        # ENHANCED MT5 REQUEST WITH PROPER TP/SL INTEGRATION
         request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,
-            "volume": lot_size,
+            "volume": round(lot_size, 2),  # Ensure proper lot size format
             "type": order_type,
-            "price": current_price,
-            "tp": tp_price if tp_price > 0 else 0.0,
-            "sl": sl_price if sl_price > 0 else 0.0,
-            "comment": f"Enhanced {strategy}",
+            "price": round(current_price, 5),  # Ensure proper price format
+            "deviation": 50,
+            "comment": f"MT5Bot-{strategy}",
             "type_time": mt5.ORDER_TIME_GTC,
             "type_filling": mt5.ORDER_FILLING_IOC,
-            "deviation": 50,  # Add deviation for better execution
         }
 
+        # Add TP/SL only if valid values exist
+        if tp_price > 0:
+            request["tp"] = round(tp_price, 5)
+            logger(f"✅ TP added to MT5 request: {tp_price:.5f}")
+
+        if sl_price > 0:
+            request["sl"] = round(sl_price, 5)
+            logger(f"✅ SL added to MT5 request: {sl_price:.5f}")
+
+        # Log complete MT5 request for debugging
+        logger(f"📤 MT5 Request: {request}")
+
+        # Verify TP/SL relationship before sending
+        if tp_price > 0 and sl_price > 0:
+            if action == "BUY":
+                tp_valid = tp_price > current_price
+                sl_valid = sl_price < current_price
+            else:  # SELL
+                tp_valid = tp_price < current_price
+                sl_valid = sl_price > current_price
+
+            if not tp_valid or not sl_valid:
+                logger(f"❌ Invalid TP/SL relationship for {action}")
+                logger(f"   Current: {current_price:.5f}, TP: {tp_price:.5f}, SL: {sl_price:.5f}")
+                return False
+
         # 5. EXECUTE ORDER
-        logger(f"📤 Sending order request...")
         result = mt5.order_send(request)
 
         # 6. PROCESS RESULT - FIXED VALIDATION

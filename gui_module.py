@@ -808,6 +808,26 @@ class TradingBotGUI:
             logger(f"❌ GUI: Error getting SL unit: {str(e)}")
             return "pips"
 
+    def get_tp_value(self) -> str:
+        """Get TP value from GUI entry field"""
+        try:
+            value = self.tp_entry.get().strip()
+            logger(f"🎯 GUI: TP value = {value}")
+            return value if value else "20"
+        except Exception as e:
+            logger(f"❌ GUI: Error getting TP value: {str(e)}")
+            return "20"
+
+    def get_sl_value(self) -> str:
+        """Get SL value from GUI entry field"""
+        try:
+            value = self.sl_entry.get().strip()
+            logger(f"🛡️ GUI: SL value = {value}")
+            return value if value else "10"
+        except Exception as e:
+            logger(f"❌ GUI: Error getting SL value: {str(e)}")
+            return "10"
+
     def start_bot(self):
         """Start the trading bot"""
         try:

@@ -197,11 +197,23 @@ def main_trading_loop() -> None:
                                         lot_size = 0.01
                                         logger(f"⚠️ Bot Controller: GUI not available, using default lot: {lot_size}")
 
-                                    # Ensure TP/SL values are strings for processing
-                                    tp_value = str(gui.get_current_tp()) if gui and hasattr(gui, 'get_current_tp') else "20"
-                                    sl_value = str(gui.get_current_sl()) if gui and hasattr(gui, 'get_current_sl') else "10"
-                                    tp_unit = str(gui.get_tp_unit()) if gui and hasattr(gui, 'get_tp_unit') else "pips"
-                                    sl_unit = str(gui.get_sl_unit()) if gui and hasattr(gui, 'get_sl_unit') else "pips"
+                                    # Get TP/SL values from GUI if available
+                                    tp_value = "20"
+                                    sl_value = "10"
+                                    tp_unit = "pips"
+                                    sl_unit = "pips"
+
+                                    try:
+                                        if gui and hasattr(gui, 'get_tp_value'):
+                                            tp_value = gui.get_tp_value()
+                                            sl_value = gui.get_sl_value()
+                                            tp_unit = gui.get_tp_unit()
+                                            sl_unit = gui.get_sl_unit()
+                                            logger(f"📊 Bot Controller: Using GUI TP/SL: {tp_value}{tp_unit}, {sl_value}{sl_unit}")
+                                        else:
+                                            logger("⚠️ Bot Controller: GUI not available, using default TP/SL")
+                                    except Exception as gui_e:
+                                        logger(f"⚠️ Bot Controller: GUI TP/SL error: {str(gui_e)}")
 
                                     logger(f"📊 Trading Parameters: Lot={lot_size}, TP={tp_value}{tp_unit}, SL={sl_value}{sl_unit}")
 
@@ -712,10 +724,22 @@ def trading_loop():
                                         lot_size = 0.01
                                         logger(f"⚠️ Bot Controller: GUI not available, using default lot: {lot_size}")
 
-                                    tp_value = str(gui.get_current_tp()) if gui and hasattr(gui, 'get_current_tp') else "20"
-                                    sl_value = str(gui.get_current_sl()) if gui and hasattr(gui, 'get_current_sl') else "10"
-                                    tp_unit = str(gui.get_tp_unit()) if gui and hasattr(gui, 'get_tp_unit') else "pips"
-                                    sl_unit = str(gui.get_sl_unit()) if gui and hasattr(gui, 'get_sl_unit') else "pips"
+                                    tp_value = "20"
+                                    sl_value = "10"
+                                    tp_unit = "pips"
+                                    sl_unit = "pips"
+
+                                    try:
+                                        if gui and hasattr(gui, 'get_tp_value'):
+                                            tp_value = gui.get_tp_value()
+                                            sl_value = gui.get_sl_value()
+                                            tp_unit = gui.get_tp_unit()
+                                            sl_unit = gui.get_sl_unit()
+                                            logger(f"📊 Bot Controller: Using GUI TP/SL: {tp_value}{tp_unit}, {sl_value}{sl_unit}")
+                                        else:
+                                            logger("⚠️ Bot Controller: GUI not available, using default TP/SL")
+                                    except Exception as gui_e:
+                                        logger(f"⚠️ Bot Controller: GUI TP/SL error: {str(gui_e)}")
 
                                     logger(f"📊 Trading Parameters: Lot={lot_size}, TP={tp_value}{tp_unit}, SL={sl_value}{sl_unit}")
 

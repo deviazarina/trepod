@@ -1,0 +1,240 @@
+def calculate_tp_sl_all_modes(input_value: str, unit: str, symbol: str, order_type: str, current_price: float, lot_size: float = 0.01) -> float:
+    """
+    Calculates Take Profit (TP) or Stop Loss (SL) values based on various input modes.
+
+    Args:
+        input_value (str): The input value for TP/SL, can be in pips, currency, or percentage.
+        unit (str): The unit of the input_value ('pips', 'currency', 'percentage').
+        symbol (str): The trading symbol (e.g., 'EURUSD').
+        order_type (str): The type of order ('buy' or 'sell').
+        current_price (float): The current market price of the symbol.
+        lot_size (float): The lot size for the trade. Defaults to 0.01.
+
+    Returns:
+        float: The calculated TP/SL price.
+
+    Raises:
+        ValueError: If the input_value or unit is invalid, or if symbol information is missing.
+        NotImplementedError: If a specific calculation mode is not yet implemented.
+    """
+    symbol_info = get_symbol_info(symbol)
+    if not symbol_info:
+        raise ValueError(f"Symbol information not found for {symbol}")
+
+    pip_value = symbol_info.get('pip_value', 0)
+    if pip_value == 0:
+        # Fallback or error if pip_value is not available
+        # For demonstration, let's assume a default or raise an error
+        # raise ValueError(f"Pip value not available for symbol {symbol}")
+        # Or try to calculate it based on typical conventions if possible
+        # For now, we'll proceed assuming it might be handled elsewhere or is 0
+        pass
+
+
+    if unit.lower() == 'pips':
+        pips_to_move = float(input_value)
+        if order_type.lower() == 'buy':
+            if pip_value > 0:
+                return current_price + (pips_to_move * pip_value)
+            else:
+                # Handle cases where pip_value might be 0 or negative if applicable
+                # This part needs careful consideration based on how pip_value is determined
+                # For many forex pairs, pip_value is directly related to the quote currency's value
+                # If pip_value is not directly available, a more complex calculation might be needed
+                # based on contract size and lot size.
+                # For now, assuming pip_value is correctly obtained or this branch is not taken.
+                raise NotImplementedError("Pip calculation without valid pip_value not implemented.")
+        elif order_type.lower() == 'sell':
+            if pip_value > 0:
+                return current_price - (pips_to_move * pip_value)
+            else:
+                raise NotImplementedError("Pip calculation without valid pip_value not implemented.")
+        else:
+            raise ValueError("Invalid order type. Must be 'buy' or 'sell'.")
+
+    elif unit.lower() == 'currency':
+        amount_in_currency = float(input_value)
+        if order_type.lower() == 'buy':
+            # For buy orders, to find the price, we need to know how much the price needs to change
+            # to result in the given currency amount for the specified lot size.
+            # The value of a pip in currency is pip_value * lot_size.
+            # So, amount_in_currency = pips_to_move * pip_value * lot_size
+            # pips_to_move = amount_in_currency / (pip_value * lot_size)
+            if pip_value > 0 and lot_size > 0:
+                pips_to_move = amount_in_currency / (pip_value * lot_size)
+                return current_price + pips_to_move
+            else:
+                # Handle cases where pip_value or lot_size is zero
+                raise ValueError("Invalid pip_value or lot_size for currency calculation.")
+        elif order_type.lower() == 'sell':
+            if pip_value > 0 and lot_size > 0:
+                pips_to_move = amount_in_currency / (pip_value * lot_size)
+                return current_price - pips_to_move
+            else:
+                raise ValueError("Invalid pip_value or lot_size for currency calculation.")
+        else:
+            raise ValueError("Invalid order type. Must be 'buy' or 'sell'.")
+
+    elif unit.lower() == 'percentage':
+        percentage = float(input_value)
+        price_change = current_price * (percentage / 100.0)
+        if order_type.lower() == 'buy':
+            return current_price + price_change
+        elif order_type.lower() == 'sell':
+            return current_price - price_change
+        else:
+            raise ValueError("Invalid order type. Must be 'buy' or 'sell'.")
+    else:
+        raise ValueError("Invalid unit. Must be 'pips', 'currency', or 'percentage'.")
+
+def get_symbol_info(symbol: str) -> dict:
+    """
+    Retrieves symbol information, including pip value.
+    This is a placeholder function. In a real application, this would query
+    a data source (like an exchange API or a configuration file) for symbol details.
+
+    Args:
+        symbol (str): The trading symbol.
+
+    Returns:
+        dict: A dictionary containing symbol information, e.g., {'pip_value': 0.0001}.
+              Returns an empty dictionary if symbol information is not found.
+    """
+    # Placeholder implementation: In a real scenario, this data would come from MT5 integration
+    # or a symbol data provider.
+    symbol_data = {
+        'EURUSD': {'pip_value': 0.0001, 'lot_step': 0.01, 'min_lot': 0.01, 'max_lot': 100.0, 'lot_size_map': {0.01: 1000}}, # Example: 1 lot = 100,000 units
+        'GBPUSD': {'pip_value': 0.0001, 'lot_step': 0.01, 'min_lot': 0.01, 'max_lot': 100.0, 'lot_size_map': {0.01: 1000}},
+        'USDJPY': {'pip_value': 0.01, 'lot_step': 0.01, 'min_lot': 0.01, 'max_lot': 100.0, 'lot_size_map': {0.01: 1000}}, # JPY pairs often use 2 decimal places for pips
+        'XAUUSD': {'pip_value': 0.01, 'lot_step': 0.01, 'min_lot': 0.01, 'max_lot': 100.0, 'lot_size_map': {0.01: 10}}, # Gold often has different pip sizing and lot values
+    }
+
+    # Adjust pip_value for symbols where the last digit is the pip (e.g., USDJPY)
+    # MT5 typically uses the smallest quote increment for pip calculation.
+    # For EURUSD, 0.0001 is a pip. For USDJPY, 0.01 is a pip.
+    # The logic here assumes pip_value is correctly provided by the source.
+    # If not, a more complex rule-based system might be needed.
+
+    # Example of how lot_size might be used to determine pip value in currency
+    # If pip_value is not directly available, we might infer it:
+    # For XAUUSD, a 0.01 lot might represent 1 unit of gold. A $1 move in price is $1 profit/loss.
+    # A pip is often defined as the smallest price change. For XAUUSD, this might be 0.01.
+    # So, a 0.01 pip move on 0.01 lot = $0.01 profit/loss. This interpretation might be tricky.
+
+    # Let's refine the pip_value logic based on common MT5 practices.
+    # For forex pairs like EURUSD, the pip is the 4th decimal place (0.0001).
+    # For USDJPY, the pip is the 2nd decimal place (0.01).
+    # The 'pip_value' in this context often refers to the monetary value of one pip for a standard lot.
+    # A more robust approach would be to get the contract size and tick value.
+    # For now, we'll stick to the direct 'pip_value' as a multiplier.
+
+    # Let's reconsider the 'pip_value' usage in `calculate_tp_sl_all_modes`.
+    # The current implementation `current_price + (pips_to_move * pip_value)` suggests `pip_value` is the price change per pip.
+    # For EURUSD, 1 pip = 0.0001. So pip_value should be 0.0001.
+    # For USDJPY, 1 pip = 0.01. So pip_value should be 0.01.
+
+    # The `lot_size_map` is more about defining the contract size for a given lot.
+    # Example: For XAUUSD, 0.01 lot might represent 1 unit of gold.
+    # If the pip is 0.01, then a 1 pip move (0.01) on 0.01 lot (1 unit) = $0.01.
+    # This seems consistent with `pip_value` being the price increment.
+
+    return symbol_data.get(symbol.upper(), {})
+
+
+# Example Usage (for demonstration purposes, these would typically be part of a larger system)
+if __name__ == "__main__":
+    # Example 1: Buy order, TP/SL in pips
+    symbol_buy = 'EURUSD'
+    current_price_buy = 1.10500
+    tp_sl_pips = 50
+    lot_size_buy = 0.1
+
+    tp_price_buy_pips = calculate_tp_sl_all_modes(str(tp_sl_pips), 'pips', symbol_buy, 'buy', current_price_buy, lot_size_buy)
+    sl_price_buy_pips = calculate_tp_sl_all_modes(str(-tp_sl_pips), 'pips', symbol_buy, 'buy', current_price_buy, lot_size_buy)
+    print(f"Buy Order ({symbol_buy}):")
+    print(f"  Current Price: {current_price_buy}")
+    print(f"  Lot Size: {lot_size_buy}")
+    print(f"  TP/SL (pips): {tp_sl_pips}")
+    print(f"  Calculated TP Price (pips): {tp_price_buy_pips:.5f}")
+    print(f"  Calculated SL Price (pips): {sl_price_buy_pips:.5f}")
+
+    # Example 2: Sell order, TP/SL in currency
+    symbol_sell = 'GBPUSD'
+    current_price_sell = 1.25800
+    tp_sl_currency = 25.0 # $25 profit/loss
+    lot_size_sell = 0.05
+
+    tp_price_sell_currency = calculate_tp_sl_all_modes(str(tp_sl_currency), 'currency', symbol_sell, 'sell', current_price_sell, lot_size_sell)
+    sl_price_sell_currency = calculate_tp_sl_all_modes(str(-tp_sl_currency), 'currency', symbol_sell, 'sell', current_price_sell, lot_size_sell)
+    print(f"\nSell Order ({symbol_sell}):")
+    print(f"  Current Price: {current_price_sell}")
+    print(f"  Lot Size: {lot_size_sell}")
+    print(f"  TP/SL (currency): ${tp_sl_currency}")
+    print(f"  Calculated TP Price (currency): {tp_price_sell_currency:.5f}")
+    print(f"  Calculated SL Price (currency): {sl_price_sell_currency:.5f}")
+
+    # Example 3: Buy order, TP/SL in percentage
+    symbol_pct = 'USDJPY'
+    current_price_pct = 150.150
+    tp_sl_percentage = 2.5 # 2.5%
+    lot_size_pct = 0.2
+
+    tp_price_pct_buy = calculate_tp_sl_all_modes(str(tp_sl_percentage), 'percentage', symbol_pct, 'buy', current_price_pct, lot_size_pct)
+    sl_price_pct_buy = calculate_tp_sl_all_modes(str(-tp_sl_percentage), 'percentage', symbol_pct, 'buy', current_price_pct, lot_size_pct)
+    print(f"\nBuy Order ({symbol_pct}):")
+    print(f"  Current Price: {current_price_pct}")
+    print(f"  Lot Size: {lot_size_pct}")
+    print(f"  TP/SL (percentage): {tp_sl_percentage}%")
+    print(f"  Calculated TP Price (percentage): {tp_price_pct_buy:.5f}")
+    print(f"  Calculated SL Price (percentage): {sl_price_pct_buy:.5f}")
+
+    # Example 4: Gold (XAUUSD) TP/SL in pips
+    symbol_xau = 'XAUUSD'
+    current_price_xau = 2350.50
+    tp_sl_pips_xau = 10 # 10 pips for XAUUSD might be $10 price movement
+    lot_size_xau = 0.02 # 0.02 lots of gold
+
+    # Note: For XAUUSD, 'pip_value' might be interpreted differently.
+    # If pip_value is 0.01, and a pip is 0.01 price movement, then 10 pips = 0.10 price movement.
+    # The value of that move depends on the contract size for the lot.
+    # In `get_symbol_info`, `lot_size_map` for XAUUSD indicates 0.01 lot = 1 unit.
+    # So, a 0.01 price move on 0.01 lot (1 unit) = $0.01 profit/loss.
+    # This means `pip_value` as the direct price increment *per unit* is correct.
+    # So, 10 pips (0.10 price move) on 0.02 lot (2 units) would be 0.10 * 2 = $0.20 profit/loss.
+    # This interpretation needs to align with how MT5 client displays profit/loss.
+    # MT5 usually shows profit/loss in the account currency, directly proportional to the price change * contract size.
+    # Let's assume `pip_value` correctly represents the price movement for one pip in the quote currency.
+    # For XAUUSD, if pip_value = 0.01, then 1 pip is $0.01.
+    # A 10 pip move is $0.10.
+
+    tp_price_xau_pips = calculate_tp_sl_all_modes(str(tp_sl_pips_xau), 'pips', symbol_xau, 'buy', current_price_xau, lot_size_xau)
+    sl_price_xau_pips = calculate_tp_sl_all_modes(str(-tp_sl_pips_xau), 'pips', symbol_xau, 'buy', current_price_xau, lot_size_xau)
+    print(f"\nBuy Order ({symbol_xau}):")
+    print(f"  Current Price: {current_price_xau}")
+    print(f"  Lot Size: {lot_size_xau}")
+    print(f"  TP/SL (pips): {tp_sl_pips_xau}")
+    print(f"  Calculated TP Price (pips): {tp_price_xau_pips:.2f}")
+    print(f"  Calculated SL Price (pips): {sl_price_xau_pips:.2f}")
+
+    # Example 5: Sell order, TP/SL in currency for XAUUSD
+    tp_sl_currency_xau = 5.0 # $5 profit/loss
+    tp_price_xau_currency = calculate_tp_sl_all_modes(str(tp_sl_currency_xau), 'currency', symbol_xau, 'sell', current_price_xau, lot_size_xau)
+    sl_price_xau_currency = calculate_tp_sl_all_modes(str(-tp_sl_currency_xau), 'currency', symbol_xau, 'sell', current_price_xau, lot_size_xau)
+    print(f"\nSell Order ({symbol_xau}):")
+    print(f"  Current Price: {current_price_xau}")
+    print(f"  Lot Size: {lot_size_xau}")
+    print(f"  TP/SL (currency): ${tp_sl_currency_xau}")
+    print(f"  Calculated TP Price (currency): {tp_price_xau_currency:.2f}")
+    print(f"  Calculated SL Price (currency): {sl_price_xau_currency:.2f}")
+
+    # Example 6: Error case - unknown unit
+    try:
+        calculate_tp_sl_all_modes("10", 'points', 'EURUSD', 'buy', 1.10500)
+    except ValueError as e:
+        print(f"\nError case (unknown unit): {e}")
+
+    # Example 7: Error case - unknown symbol
+    try:
+        calculate_tp_sl_all_modes("10", 'pips', 'XYZUSD', 'buy', 1.10500)
+    except ValueError as e:
+        print(f"\nError case (unknown symbol): {e}")
