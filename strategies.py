@@ -228,6 +228,61 @@ def run_strategy(strategy: str, df: pd.DataFrame, symbol: str) -> Tuple[Optional
         logger(f"   🎯 Real-time: Bid={current_bid:.{digits}f} Ask={current_ask:.{digits}f} Spread={current_spread:.{digits}f}")
         logger(f"   💡 Current Price: {current_price:.{digits}f} (Mid-price)")
 
+        # SMART SIGNAL VALIDATION - Pastikan tidak ngawur
+        try:
+            from smart_signal_validator import validate_trading_signal
+            
+            # Prepare analysis data for validation
+            validation_data = {
+                'confidence': confidence if 'confidence' in locals() else 0.6,
+                'tp_pips': 15,  # Will be adjusted by validator
+                'sl_pips': 8,   # Will be adjusted by validator
+                'current_spread': current_spread,
+                'typical_spread': current_spread * 1.2,
+                'strategy': strategy
+            }
+            
+            # Add any available technical signals
+            if 'enhanced_result' in locals() and enhanced_result:
+                validation_data.update({
+                    'base_signal': enhanced_result.get('signal'),
+                    'base_confidence': enhanced_result.get('confidence', 0),
+                    'technical_analysis': enhanced_result.get('analysis', {})
+                })
+            
+            # Smart validation akan mencegah trades yang ngawur
+            validation_result = validate_trading_signal(symbol, enhanced_result.get('signal', 'NEUTRAL'), validation_data, df)
+            
+            if not validation_result['is_valid']:
+                logger(f"🛑 SMART VALIDATION: Trade REJECTED for {symbol}")
+                logger(f"   ❌ Quality Grade: {validation_result['quality_grade']}")
+                logger(f"   ❌ Reasons: {', '.join(validation_result['rejection_reasons'])}")
+                return None, validation_result['rejection_reasons']
+            
+            # Apply validation multipliers untuk trades berkualitas
+            confidence_multiplier = validation_result['confidence_multiplier']
+            position_multiplier = validation_result['position_size_multiplier']
+            quality_grade = validation_result['quality_grade']
+            
+            logger(f"✅ SMART VALIDATION: {quality_grade} grade signal APPROVED")
+            logger(f"   🎯 Quality Score: {validation_result['quality_score']:.1%}")
+            logger(f"   📈 Confidence boost: {confidence_multiplier:.2f}x")
+            logger(f"   📊 Position size: {position_multiplier:.2f}x")
+            
+            # Override TP/SL with validated recommendations if available
+            if validation_result.get('recommended_tp') and validation_result.get('recommended_sl'):
+                validation_data['tp_pips'] = validation_result['recommended_tp']
+                validation_data['sl_pips'] = validation_result['recommended_sl']
+                logger(f"   🎯 Optimized TP: {validation_data['tp_pips']} pips")
+                logger(f"   🛡️ Optimized SL: {validation_data['sl_pips']} pips")
+                
+        except Exception as validation_error:
+            logger(f"⚠️ Smart validation error: {str(validation_error)}")
+            # Continue without validation if validator fails
+            confidence_multiplier = 1.0
+            position_multiplier = 1.0
+            quality_grade = 'B'
+
         # Price movement analysis
         price_change = round(current_price - last_close, digits)
         price_change_pips = abs(price_change) / point
