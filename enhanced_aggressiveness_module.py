@@ -315,6 +315,7 @@ class EnhancedAggressivenessModule:
 
 # Global instance
 aggressiveness_module = EnhancedAggressivenessModule()
+enhanced_aggressiveness_module = EnhancedAggressivenessModule()  # Add missing instance
 
 
 def apply_smart_aggressiveness(symbol: str, strategy: str, analysis_result: Dict[str, Any]) -> Dict[str, Any]:
