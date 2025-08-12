@@ -277,6 +277,9 @@ def execute_trade(symbol: str, action: str, lot_size: float = 0.01, tp_value: st
         if tp_value and str(tp_value).strip() not in ["0", ""]:
             try:
                 tp_str = str(tp_value).strip()
+                # Ensure TP is always positive (represents profit target)
+                if tp_str.startswith('-'):
+                    tp_str = tp_str[1:]  # Remove negative sign
                 tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
                 if tp_price > 0:
                     # Validate TP level for MT5 compatibility
@@ -296,9 +299,13 @@ def execute_trade(symbol: str, action: str, lot_size: float = 0.01, tp_value: st
         if sl_value and str(sl_value).strip() not in ["0", ""]:
             try:
                 sl_str = str(sl_value).strip()
-                # Always use negative for SL calculation
-                if not sl_str.startswith('-'):
-                    sl_str = f"-{sl_str}"
+                # For percentage and money units, pass negative value to indicate SL
+                if sl_unit.lower() in ["percent", "percentage", "%", "money", "balance%", "equity%"]:
+                    if not sl_str.startswith('-'):
+                        sl_str = f"-{sl_str}"
+                else:
+                    # For pips and price units, use positive value (function handles direction internally)
+                    sl_str = str(abs(float(sl_str)))
                 sl_price = calculate_tp_sl_all_modes(sl_str, sl_unit, symbol, action, current_price, lot_size)
                 if sl_price > 0:
                     # Validate SL level for MT5 compatibility
@@ -476,6 +483,9 @@ def execute_trade_signal(symbol: str, action: str, lot_size: float = 0.01, tp_va
         if tp_value and str(tp_value).strip() not in ["0", ""]:
             try:
                 tp_str = str(tp_value).strip()
+                # Ensure TP is always positive (represents profit target)
+                if tp_str.startswith('-'):
+                    tp_str = tp_str[1:]  # Remove negative sign
                 tp_price = calculate_tp_sl_all_modes(tp_str, tp_unit, symbol, action, current_price, lot_size)
                 if tp_price > 0:
                     # Validate TP level for MT5 compatibility
@@ -495,9 +505,13 @@ def execute_trade_signal(symbol: str, action: str, lot_size: float = 0.01, tp_va
         if sl_value and str(sl_value).strip() not in ["0", ""]:
             try:
                 sl_str = str(sl_value).strip()
-                # Always use negative for SL calculation
-                if not sl_str.startswith('-'):
-                    sl_str = f"-{sl_str}"
+                # For percentage and money units, pass negative value to indicate SL
+                if sl_unit.lower() in ["percent", "percentage", "%", "money", "balance%", "equity%"]:
+                    if not sl_str.startswith('-'):
+                        sl_str = f"-{sl_str}"
+                else:
+                    # For pips and price units, use positive value (function handles direction internally)
+                    sl_str = str(abs(float(sl_str)))
                 sl_price = calculate_tp_sl_all_modes(sl_str, sl_unit, symbol, action, current_price, lot_size)
                 if sl_price > 0:
                     # Validate SL level for MT5 compatibility
