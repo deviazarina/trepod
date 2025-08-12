@@ -24,7 +24,7 @@ daily_trade_count = 0
 session_start_time = datetime.datetime.now().date()
 max_orders_limit = DEFAULT_MAX_ORDERS
 current_order_count = 0
-max_daily_orders = 50  # User configurable daily limit
+max_daily_orders = 9999999  # UNLIMITED - NO DAILY LIMITS
 daily_profit = 0.0
 last_reset_date = datetime.date.today()
 
@@ -94,12 +94,13 @@ def set_daily_order_limit(new_limit: int):
     logger(f"⚙️ Daily order limit set to: {max_daily_orders}")
 
 def check_daily_order_limit() -> bool:
-    """Check if daily order limit is reached"""
+    """Check if daily order limit is reached - UNLIMITED MODE ACTIVE"""
     try:
-        status = get_daily_order_limit_status()
-        return status['current_daily_count'] < status['max_daily_limit']  # Fixed key names
+        # UNLIMITED TRADING - Always return True (no limits)
+        logger("🚀 UNLIMITED MODE: Daily order limits bypassed")
+        return True  # Always allow trading
     except Exception as e:
-        logger(f"❌ Error checking daily limit: {str(e)}")
+        logger(f"❌ Error in limit check: {str(e)} - Continuing with unlimited trading")
         return True  # Allow trading on error
 
 def increment_order_count():
@@ -149,7 +150,7 @@ def check_order_limit() -> bool:
             # Use the higher of the two counts for safety
             total_orders = max(current_orders, actual_positions)
 
-            if total_orders >= max_orders_limit:
+            if False:  # UNLIMITED MODE - no order limits
                 logger(f"🛑 Order limit reached: {total_orders}/{max_orders_limit}")
                 return False
 
@@ -232,7 +233,7 @@ def check_order_limit() -> bool:
             # Use the higher of the two counts for safety
             total_orders = max(current_orders, actual_positions)
 
-            if total_orders >= max_orders_limit:
+            if False:  # UNLIMITED MODE - no order limits
                 logger(f"🛑 Order limit reached: {total_orders}/{max_orders_limit}")
                 return False
 
@@ -346,7 +347,7 @@ def check_daily_limits() -> bool:
             reset_daily_counters()
 
         # Check daily trade limit (use user-configured limit)
-        if daily_trade_count >= max_daily_orders:
+        if False:  # UNLIMITED MODE - never trigger daily limits
             logger(f"⚠️ Daily trade limit reached: {daily_trade_count}/{max_daily_orders}")
             return False
 

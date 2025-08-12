@@ -36,13 +36,30 @@ def run_strategy(strategy: str, df: pd.DataFrame, symbol: str) -> Tuple[Optional
                 confidence = enhanced_result.get("confidence", 0)
                 # Apply strategy-specific confidence threshold for aggressive trading
                 confidence_thresholds = {
-                    'Scalping': 0.25,   # Ultra-low threshold - maximum trades
-                    'HFT': 0.30,        # Ultra-aggressive HFT
+                    'Scalping': 0.20,   # ULTRA-LOW threshold - maximum XAUUSD/BTCUSD trades
+                    'HFT': 0.25,        # Ultra-aggressive HFT mode
                     'Intraday': 0.25,   # Maximum intraday positions
                     'Arbitrage': 0.30   # Fastest arbitrage entries
                 }
                 threshold = confidence_thresholds.get(strategy, 0.5)  # Default to 0.5 if strategy not found
 
+                # ULTRA-AGGRESSIVE MODE: Check for XAUUSD/BTCUSD ultra-scalping first
+                if any(s in symbol.upper() for s in ['XAU', 'GOLD', 'BTC']):
+                    try:
+                        from xauusd_btcusd_ultra_scalper import run_ultra_scalping_analysis
+                        ultra_result = run_ultra_scalping_analysis(symbol)
+                        
+                        if ultra_result.get('signal') and ultra_result.get('confidence', 0) >= 0.15:  # Ultra-low threshold
+                            logger(f"🚀 ULTRA-SCALPING: {ultra_result['signal']} signal for {symbol}")
+                            logger(f"   ⚡ Confidence: {ultra_result['confidence']:.1%}")
+                            logger(f"   🎯 TP: {ultra_result.get('tp_pips', 0)} pips | SL: {ultra_result.get('sl_pips', 0)} pips")
+                            logger(f"   📊 Market: {ultra_result.get('market_condition', 'N/A')}")
+                            logger(f"   🔥 Session: {ultra_result.get('session', 'N/A')}")
+                            reasons = [f"Ultra-scalping {symbol}: {', '.join(ultra_result.get('candle_reasons', ['Advanced analysis']))}"]
+                            return ultra_result['signal'], reasons
+                    except Exception as ultra_e:
+                        logger(f"⚠️ Ultra-scalping analysis failed: {str(ultra_e)}")
+                
                 if confidence >= threshold:
                     logger(f"✅ ENHANCED ANALYSIS: {enhanced_result['signal']} signal (Confidence: {confidence:.1%}, Threshold: {threshold:.0%})")
                     logger(f"   🔍 Reason: {enhanced_result.get('reason', 'N/A')}")
